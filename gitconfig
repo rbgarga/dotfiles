@@ -1,6 +1,10 @@
 [user]
 	name = Renato Botelho
 	email = garga@FreeBSD.org
+[includeIf "gitdir:~/work/"]
+	path = ~/.gitconfig-work
+[includeIf "gitdir:~/work/personal/"]
+	path = ~/.gitconfig-personal
 [core]
 	pager = less -F -X
 	ignorecase = false

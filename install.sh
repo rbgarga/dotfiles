@@ -22,7 +22,7 @@ done
 mydir=$(realpath $(dirname $0 ))
 os=$(uname -s)
 
-conf_files="gitconfig git_template tmux.conf"
+conf_files="gitconfig gitconfig-work gitconfig-personal git_template tmux.conf"
 
 if [ -d "${HOME}/bin" ]; then
 	echo "${HOME}/bin is a directory, skipping... "
