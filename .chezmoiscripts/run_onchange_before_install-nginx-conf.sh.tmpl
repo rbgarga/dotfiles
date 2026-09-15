@@ -1,0 +1,11 @@
+{{- if eq .chezmoi.os "freebsd" -}}
+#!/bin/sh
+# onchange: {{ includeTemplate ".nginx.conf.tmpl" . | sha256sum }}
+set -e
+[ -d /usr/local/etc/nginx ] || exit 0
+sudo tee /usr/local/etc/nginx/nginx.conf >/dev/null <<'NGINX'
+{{ includeTemplate ".nginx.conf.tmpl" . }}NGINX
+if sudo service -e nginx >/dev/null 2>&1; then
+    sudo service nginx reload
+fi
+{{- end -}}

@@ -1,5 +1,0 @@
-#!/bin/sh
-
-case "$1" in
-	rebase) exec ~/bin/hook_ctags.sh >/dev/null 2>&1 & ;;
-esac

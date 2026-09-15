@@ -1,0 +1,32 @@
+{{- if and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "ubuntu" "debian") -}}
+#!/bin/sh
+# onchange: {{ includeTemplate ".apt-packages" . | sha256sum }}
+set -e
+
+export DEBIAN_FRONTEND=noninteractive
+
+sudo apt-get update -y
+sudo apt-get install -y{{ range $pkg := splitList "\n" (includeTemplate ".apt-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
+
+# lazygit is missing from older releases; best effort only
+sudo apt-get install -y lazygit >/dev/null 2>&1 || \
+    echo "NOTE: lazygit not available in this release, skipping"
+
+# Distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for current LazyVim.
+# Install 'bob' (nvim version manager); the nvim shim lands in ~/bin, which
+# precedes /usr/bin in PATH (prezto zprofile).
+mkdir -p "$HOME/bin"
+case "{{ .chezmoi.arch }}" in
+    amd64) asset=bob-linux-x86_64.zip ;;
+    arm64) asset=bob-linux-arm.zip ;;
+    *) echo "ERROR: unsupported architecture {{ .chezmoi.arch }}" >&2; exit 1 ;;
+esac
+curl -fsSL -o /tmp/bob.zip "https://github.com/MordechaiHadad/bob/releases/latest/download/$asset"
+unzip -oq /tmp/bob.zip -d /tmp/bob-extract
+mv -f "$(find /tmp/bob-extract -type f -name bob | head -1)" "$HOME/bin/bob"
+chmod 0755 "$HOME/bin/bob"
+rm -rf /tmp/bob.zip /tmp/bob-extract
+
+"$HOME/bin/bob" install stable
+"$HOME/bin/bob" use stable
+{{- end -}}

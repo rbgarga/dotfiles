@@ -1,0 +1,19 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/sh
+# onchange: {{ includeTemplate ".brew-packages" . | sha256sum }}
+set -e
+
+if ! command -v brew >/dev/null 2>&1; then
+    echo "ERROR: Homebrew is not installed - see https://brew.sh" >&2
+    exit 1
+fi
+if ! xcode-select -p >/dev/null 2>&1; then
+    echo "ERROR: Xcode Command Line Tools missing - run: xcode-select --install" >&2
+    exit 1
+fi
+
+export HOMEBREW_NO_INSTALL_UPGRADE=1
+export HOMEBREW_NO_AUTO_UPDATE=1
+
+brew install{{ range $pkg := splitList "\n" (includeTemplate ".brew-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
+{{- end -}}

@@ -1,0 +1,8 @@
+[".zprezto"]
+    type = "git-repo"
+    url = "git@github.com:rbgarga/prezto.git"
+    refreshPeriod = "168h"
+    exact = true
+    clone.args = ["--recurse-submodules"]
+    pull.args = ["--recurse-submodules"]
+    update = true

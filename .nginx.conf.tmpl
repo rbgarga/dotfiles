@@ -18,13 +18,14 @@ http {
     sendfile        on;
     keepalive_timeout  65;
     server {
-        listen       443 ssl;
-        listen       [::]:443 ssl;
-        server_name  idaho.arrakis.com.br;
+        listen       80;
+        listen       [::]:80;
+        server_name  {{ .chezmoi.fqdnHostname }};
 
-        ssl_certificate     /usr/local/etc/nginx/certs/idaho.arrakis.com.br/fullchain;
-        ssl_certificate_key /usr/local/etc/nginx/certs/idaho.arrakis.com.br/key;
-
+        location /.well-known/acme-challenge/ {
+                root /usr/local/www/{{ .chezmoi.fqdnHostname }};
+                try_files $uri =404;
+        }
         location / {
             root   /usr/local/share/poudriere/html;
             index  index.html index.htm;
@@ -52,19 +53,6 @@ http {
         error_page   500 502 503 504  /50x.html;
         location = /50x.html {
             root   /usr/local/www/nginx-dist;
-        }
-    }
-
-    server {
-        listen 80;
-        listen [::]:80;
-        server_name  idaho.arrakis.com.br;
-        location /.well-known/acme-challenge/ {
-                root /usr/local/www/idaho.arrakis.com.br;
-                try_files $uri =404;
-        }
-        location / {
-                return 301 https://$server_name$request_uri;
         }
     }
 }

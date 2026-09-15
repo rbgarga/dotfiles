@@ -1,0 +1,20 @@
+{{- /* Map hostnames to profiles. Unknown hosts default to "ssh".
+   Add new hosts here, one line per host: "hostname" "desktop"|"ssh" */ -}}
+{{- $profiles := dict
+      "e14" "desktop"
+      "garga-chimera-dev" "ssh"
+      "garga-freebsd-dev" "ssh"
+      "garga-noble-dev" "ssh"
+      "garga-resolute-dev" "ssh"
+      "garga-trixie-dev" "ssh"
+      "m2" "desktop"
+-}}
+{{- $host := .chezmoi.hostname -}}
+{{- $profile := "ssh" -}}
+{{- if hasKey $profiles $host -}}
+{{- $profile = index $profiles $host -}}
+{{- end -}}
+
+[data]
+    profile = "{{ $profile }}"
+    desktop = {{ eq $profile "desktop" }}

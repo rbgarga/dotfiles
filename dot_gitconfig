@@ -21,12 +21,6 @@
 [merge]
 	tool = vimdiff
 	conflictstyle = diff3
-[sendemail]
-	smtpEncryption = tls
-	smtpServer = smtp.gmail.com
-	smtpUser = garga.bsd@gmail.com
-	smtpServerPort = 587
-	smtpPass = *************
 [fetch]
 	prune = true
 [filter "lfs"]
@@ -34,8 +28,6 @@
 	required = true
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
-[init]
-	templatedir = ~/.git_template
 [pull]
 	rebase = true
 [rebase]

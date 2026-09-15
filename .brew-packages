@@ -1,0 +1,15 @@
+neovim
+git
+ripgrep
+fd
+fzf
+lazygit
+node
+go
+python3
+php
+cmake
+shellcheck
+shfmt
+golangci-lint
+hadolint

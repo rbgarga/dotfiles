@@ -1,0 +1,9 @@
+[user]
+	name = Renato Botelho
+	email = garga@FreeBSD.org
+[sendemail]
+	smtpEncryption = tls
+	smtpServer = smtp.gmail.com
+	smtpUser = garga.bsd@gmail.com
+	smtpServerPort = 587
+	smtpPass = *************

@@ -1,0 +1,29 @@
+README.md
+LICENSE
+.DS_Store
+pkg_list
+
+{{ if ne .chezmoi.os "freebsd" }}
+.XCompose
+.login_conf
+.wallpaper.jpg
+.wallpaper2.jpg
+.config/sway
+.config/i3status-config
+bin/display-setup.sh
+bin/vol.sh
+bin/launcher.sh
+bin/update_freebsd.sh
+{{ end }}
+
+{{ if not .desktop }}
+.XCompose
+.wallpaper.jpg
+.wallpaper2.jpg
+.config/ghostty
+.config/sway
+.config/i3status-config
+bin/display-setup.sh
+bin/vol.sh
+bin/launcher.sh
+{{ end }}
