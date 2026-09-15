@@ -65,3 +65,8 @@ clipboard-write = allow
 copy-on-select = clipboard
 clipboard-paste-protection = false
 clipboard-trim-trailing-spaces = true
+
+# Forward Cmd+PgUp/PgDn to the app as Alt+PgUp/PgDn (tmux binds these for
+# pane history scrolling); overrides ghostty's local Cmd+PgUp scrollback
+keybind = super+page_up=text:\x1b[5;3~
+keybind = super+page_down=text:\x1b[6;3~
