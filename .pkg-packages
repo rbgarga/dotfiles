@@ -10,7 +10,7 @@ go
 python3
 cmake
 gmake
-shellcheck
+hs-ShellCheck
 shfmt
 tree-sitter-cli
 golangci-lint
