@@ -1,0 +1,11 @@
+#!/bin/sh
+# onchange: {{ includeTemplate "dot_tmux.conf" . | sha256sum }}
+# Reload the tmux server config whenever dot_tmux.conf changes; tmux servers
+# only read ~/.tmux.conf once at startup, so stale servers otherwise keep
+# old options and keybinds after a chezmoi update.
+
+# No tmux installed, or no server running (never start one implicitly)
+command -v tmux >/dev/null 2>&1 || exit 0
+tmux list-sessions >/dev/null 2>&1 || exit 0
+
+tmux source-file "$HOME/.tmux.conf"
