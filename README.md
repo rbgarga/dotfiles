@@ -48,6 +48,8 @@ XCompose/login_conf only on FreeBSD).
   manager, since distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for
   current LazyVim. bob lives in `~/bin` and `bob use stable` leaves the
   active nvim shim in `~/bin`, ahead of `/usr/bin` in PATH (prezto zprofile).
+  An existing node installation (e.g. NodeSource, which bundles npm and
+  conflicts with the distro `npm` package) is detected and respected.
 - **Chimera Linux**: `apk add` (`.apk-packages`) via `doas` (falls back to
   `sudo`). Chimera is musl-based — Mason's glibc prebuilt binaries mostly
   won't run, so expect degraded LSP/formatter coverage and rely on system

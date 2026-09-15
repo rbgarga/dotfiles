@@ -8,6 +8,14 @@ export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -y
 sudo apt-get install -y{{ range $pkg := splitList "\n" (includeTemplate ".apt-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
 
+# node/npm: respect an existing installation (e.g. NodeSource, which bundles
+# npm and conflicts with the distro npm package); distro pair only if missing
+if ! command -v node >/dev/null 2>&1; then
+    sudo apt-get install -y nodejs npm
+else
+    echo "node $(node --version) already present, skipping nodejs/npm"
+fi
+
 # lazygit is missing from older releases; best effort only
 sudo apt-get install -y lazygit >/dev/null 2>&1 || \
     echo "NOTE: lazygit not available in this release, skipping"
