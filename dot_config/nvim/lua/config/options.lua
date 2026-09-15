@@ -4,6 +4,10 @@
 
 vim.g.autoformat = false
 vim.opt.background = "dark"
+-- Skip nvim's startup terminal probes: over ssh they time out (E1568) and
+-- slow startup. We force background/termguicolors instead of auto-detecting.
+vim.opt.ttyfast = false
+vim.opt.termguicolors = true
 vim.opt.colorcolumn = "80"
 vim.opt.cursorline = true
 vim.opt.expandtab = false

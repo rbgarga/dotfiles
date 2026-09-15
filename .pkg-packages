@@ -12,6 +12,7 @@ cmake
 gmake
 shellcheck
 shfmt
+tree-sitter-cli
 golangci-lint
 tflint
 php84

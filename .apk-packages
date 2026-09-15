@@ -13,6 +13,7 @@ make
 cmake
 shellcheck
 shfmt
+tree-sitter-cli
 unzip
 curl
 php83

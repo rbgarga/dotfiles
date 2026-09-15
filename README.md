@@ -44,7 +44,8 @@ XCompose/login_conf only on FreeBSD).
   version you target. `hadolint` is not available (not in ports; Mason
   prebuilt binaries are Linux/macOS-only) — everything else is covered by
   system packages. `gmake` is required to build `telescope-fzf-native.nvim`
-  (the stock `make` is bmake, which cannot parse GNU Makefiles).
+  (the stock `make` is bmake, which cannot parse GNU Makefiles);
+  `tree-sitter-cli` is required by nvim-treesitter `main`.
 - **Ubuntu/Debian**: `apt-get` (`.apt-packages`) plus `bob`, the nvim version
   manager, since distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for
   current LazyVim. bob lives in `~/bin` and `bob use stable` leaves the
