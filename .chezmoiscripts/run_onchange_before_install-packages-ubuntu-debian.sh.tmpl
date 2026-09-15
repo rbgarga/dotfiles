@@ -23,7 +23,10 @@ sudo apt-get install -y lazygit >/dev/null 2>&1 || \
 # Distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for current LazyVim.
 # Install 'bob' (nvim version manager); the nvim shim lands in ~/bin, which
 # precedes /usr/bin in PATH (prezto zprofile).
-mkdir -p "$HOME/bin"
+if [ ! -d "$HOME/bin" ]; then
+    rm -f "$HOME/bin"   # dangling symlink or stray file from the old install.sh
+    mkdir -p "$HOME/bin"
+fi
 case "{{ .chezmoi.arch }}" in
     amd64) asset=bob-linux-x86_64.zip ;;
     arm64) asset=bob-linux-arm.zip ;;
