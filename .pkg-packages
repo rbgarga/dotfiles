@@ -9,6 +9,7 @@ npm
 go
 python3
 cmake
+gmake
 shellcheck
 shfmt
 golangci-lint

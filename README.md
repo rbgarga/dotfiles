@@ -43,7 +43,8 @@ XCompose/login_conf only on FreeBSD).
 - **FreeBSD**: `pkg install` from `.pkg-packages`. Adjust `php84` to the PHP
   version you target. `hadolint` is not available (not in ports; Mason
   prebuilt binaries are Linux/macOS-only) — everything else is covered by
-  system packages.
+  system packages. `gmake` is required to build `telescope-fzf-native.nvim`
+  (the stock `make` is bmake, which cannot parse GNU Makefiles).
 - **Ubuntu/Debian**: `apt-get` (`.apt-packages`) plus `bob`, the nvim version
   manager, since distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for
   current LazyVim. bob lives in `~/bin` and `bob use stable` leaves the
