@@ -18,6 +18,7 @@ fi
 # rely on system packages where the ports carry them.
 for pkg in{{ range $pkg := splitList "\n" (includeTemplate ".apk-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
 do
+    apk info -e "$pkg" >/dev/null 2>&1 && continue
     $PRIV apk add "$pkg" || \
         echo "WARNING: failed to install $pkg - not in Chimera ports? adjust .apk-packages"
 done

@@ -7,6 +7,7 @@ set -e
 # version) does not abort the rest
 for pkg in{{ range $pkg := splitList "\n" (includeTemplate ".pkg-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
 do
+    pkg info -e "$pkg" >/dev/null 2>&1 && continue
     sudo env ASSUME_ALWAYS_YES=yes pkg install -y "$pkg" || \
         echo "WARNING: failed to install $pkg - adjust .pkg-packages"
 done
