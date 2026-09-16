@@ -40,12 +40,13 @@ XCompose/login_conf only on FreeBSD).
 
 - **macOS**: Homebrew (`brew install` from `.brew-packages`). Errors with
   instructions if brew or the Xcode CLT are missing.
-- **FreeBSD**: `pkg install` from `.pkg-packages`. Adjust `php84` to the PHP
-  version you target. `hadolint` is not available (not in ports; Mason
-  prebuilt binaries are Linux/macOS-only) — everything else is covered by
-  system packages. `gmake` is required to build `telescope-fzf-native.nvim`
-  (the stock `make` is bmake, which cannot parse GNU Makefiles);
-  `tree-sitter-cli` is required by nvim-treesitter `main`.
+- **FreeBSD**: `pkg install` from `.pkg-packages`. `hadolint` is not
+  available (not in ports; Mason prebuilt binaries are Linux/macOS-only).
+  `gmake` is required to build `telescope-fzf-native.nvim` (the stock
+  `make` is bmake, which cannot parse GNU Makefiles); `tree-sitter-cli` is
+  required by nvim-treesitter `main`; `gopls`, `lua-language-server`,
+  `terraform-ls` and `ruff` provide the LSPs/formatters Mason cannot install
+  here.
 - **Ubuntu/Debian**: `apt-get` (`.apt-packages`) plus `bob`, the nvim version
   manager, since distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for
   current LazyVim. bob lives in `~/bin` and `bob use stable` leaves the
@@ -54,12 +55,13 @@ XCompose/login_conf only on FreeBSD).
   conflicts with the distro `npm` package) is detected and respected.
 - **Chimera Linux**: `apk add` (`.apk-packages`) via `doas` (falls back to
   `sudo`). Chimera is musl-based — Mason's glibc prebuilt binaries mostly
-  won't run, so expect degraded LSP/formatter coverage and rely on system
-  packages where the ports carry them.
+  won't run, so LSPs/formatters come from system packages (`gopls`, `ruff`,
+  `tree-sitter-cli`). Not packaged upstream: `shellcheck`,
+  `lua-language-server` and a separate `npm` (it is bundled with `nodejs`).
 
-Mason handles per-language tools (stylua, shfmt, formatters, LSPs) inside
-nvim; system packages provide the toolchains they need (go, node, python,
-php).
+Mason handles per-language tools where binaries exist; system packages
+provide the toolchains and the LSPs/formatters Mason cannot install
+(FreeBSD/Chimera). PHP support is macOS/FreeBSD only.
 
 Terminal notes: nvim mouse selection requires mouse reporting enabled in the
 terminal (iTerm2 enables it by default; make sure "Disable session-initiated

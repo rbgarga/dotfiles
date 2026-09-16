@@ -1,7 +1,7 @@
 neovim
 git
 ripgrep
-fd
+fd-find
 fzf
 lazygit
 node
@@ -15,6 +15,10 @@ shfmt
 tree-sitter-cli
 golangci-lint
 tflint
-php84
+php85
 unzip
 curl
+gopls
+lua-language-server
+terraform-ls
+ruff

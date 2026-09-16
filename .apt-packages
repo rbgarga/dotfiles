@@ -12,5 +12,4 @@ python3-venv
 cmake
 shellcheck
 shfmt
-php-cli
-php-xml
+ruff

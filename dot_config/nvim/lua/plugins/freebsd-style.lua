@@ -9,6 +9,12 @@ if vim.fn.has("autocmd") == 1 then
         if vim.fn.exists("*FreeBSD_Style") == 1 then
           vim.fn.FreeBSD_Style()
         end
+        -- freebsd.vim maps <Leader>f, shadowing LazyVim's find group;
+        -- move the style function to <leader>fs instead
+        pcall(vim.cmd, "silent! nunmap <Leader>f")
+        vim.keymap.set("n", "<leader>fs", function()
+          vim.fn.FreeBSD_Style()
+        end, { desc = "FreeBSD style", buffer = true })
       end
     end,
   })
