@@ -1,3 +1,6 @@
+# Poudriere web frontend. LAN-only by intent: directory listings expose the
+# installed package set and build activity, so do not expose this beyond the
+# local network.
 worker_processes  1;
 events {
     worker_connections  1024;

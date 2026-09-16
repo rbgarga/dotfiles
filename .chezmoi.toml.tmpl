@@ -14,7 +14,11 @@
 {{- if hasKey $profiles $host -}}
 {{- $profile = index $profiles $host -}}
 {{- end -}}
+{{- /* Hosts running the poudriere nginx frontend; gates the nginx config
+   install script. Add hostnames here, e.g. "e14" */ -}}
+{{- $poudriere := list "e14" -}}
 
 [data]
     profile = "{{ $profile }}"
     desktop = {{ eq $profile "desktop" }}
+    poudriere = {{ has $host $poudriere }}

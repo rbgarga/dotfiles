@@ -4,13 +4,22 @@
 set -e
 
 # Install one-by-one so a single unavailable package (e.g. a missing php
-# version) does not abort the rest
+# version) does not abort the rest; failures are counted and abort the run
+# at the end so apply visibly fails and gets retried on the next update
+failed=0
 for pkg in{{ range $pkg := splitList "\n" (includeTemplate ".pkg-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
 do
     pkg info -e "$pkg" >/dev/null 2>&1 && continue
-    sudo env ASSUME_ALWAYS_YES=yes pkg install -y "$pkg" || \
+    sudo env ASSUME_ALWAYS_YES=yes pkg install -y "$pkg" || {
         echo "WARNING: failed to install $pkg - adjust .pkg-packages"
+        failed=$((failed + 1))
+    }
 done
+
+[ "$failed" -eq 0 ] || {
+    echo "ERROR: $failed package(s) failed to install"
+    exit 1
+}
 
 # Mason-based python tools need pip; python3 on FreeBSD does not ship it enabled
 python3 -m ensurepip --user >/dev/null 2>&1 || true

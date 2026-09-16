@@ -15,11 +15,20 @@ fi
 
 # Install one-by-one so a single unavailable package does not abort the rest;
 # Chimera is musl-based, so expect Mason glibc prebuilts to fail at runtime and
-# rely on system packages where the ports carry them.
+# rely on system packages where the ports carry them. Failures are counted and
+# abort the run at the end so apply visibly fails and gets retried.
+failed=0
 for pkg in{{ range $pkg := splitList "\n" (includeTemplate ".apk-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
 do
     apk info -e "$pkg" >/dev/null 2>&1 && continue
-    $PRIV apk --interactive=no add "$pkg" || \
+    $PRIV apk add --interactive=no "$pkg" || {
         echo "WARNING: failed to install $pkg - not in Chimera ports? adjust .apk-packages"
+        failed=$((failed + 1))
+    }
 done
+
+[ "$failed" -eq 0 ] || {
+    echo "ERROR: $failed package(s) failed to install"
+    exit 1
+}
 {{- end -}}

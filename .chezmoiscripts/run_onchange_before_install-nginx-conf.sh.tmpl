@@ -1,4 +1,4 @@
-{{- if eq .chezmoi.os "freebsd" -}}
+{{- if and (eq .chezmoi.os "freebsd") (default false .poudriere) -}}
 #!/bin/sh
 # onchange: {{ includeTemplate ".nginx.conf.tmpl" . | sha256sum }}
 set -e
