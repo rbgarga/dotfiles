@@ -60,8 +60,9 @@ XCompose/login_conf only on FreeBSD).
   `lua-language-server` and a separate `npm` (it is bundled with `nodejs`).
 
 Mason handles per-language tools where binaries exist; system packages
-provide the toolchains and the LSPs/formatters Mason cannot install
-(FreeBSD/Chimera). PHP support is macOS/FreeBSD only.
+provide the toolchains and the LSPs/formatters Mason cannot install on
+FreeBSD/Chimera only — on macOS, Ubuntu/Debian everything comes through
+Mason. PHP support is macOS/FreeBSD only.
 
 Terminal notes: nvim mouse selection requires mouse reporting enabled in the
 terminal (iTerm2 enables it by default; make sure "Disable session-initiated
