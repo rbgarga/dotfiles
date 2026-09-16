@@ -4,10 +4,6 @@
 
 local set = vim.keymap.set
 
--- Navigate through buffers
-set("n", "<M-Right>", "<cmd>bn<CR>", { desc = "Next Buffer" })
-set("n", "<M-Left>", "<cmd>bp<CR>", { desc = "Previous Buffer" })
-
 -- Delete current buffer and switch to previous one
 set("n", "<C-x>", "<cmd>bp | bd #<CR>", { desc = "Delete Current Buffer and Switch" })
 
