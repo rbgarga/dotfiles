@@ -8,6 +8,11 @@ window-width = 116
 # Initial window directory
 working-directory = home
 window-inherit-working-directory = false
+tab-inherit-working-directory = false
+split-inherit-working-directory = false
+
+# Do not move cursor on mouse click
+cursor-click-to-move = false
 
 # Colors - Gruvbox dark (medium), matching gruvbox.nvim's palette
 background = #282828
