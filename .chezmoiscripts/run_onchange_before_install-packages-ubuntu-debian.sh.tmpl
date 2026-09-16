@@ -7,15 +7,6 @@ export DEBIAN_FRONTEND=noninteractive
 
 sudo apt-get update -y
 
-# Resolute+ defaults to Rust coreutils (uutils); restore GNU coreutils.
-# Both provider packages only exist on recent Ubuntu releases, so older
-# releases and Debian skip this automatically.
-if apt-cache show coreutils-from-gnu >/dev/null 2>&1 && \
-   apt-cache show coreutils-from-uutils >/dev/null 2>&1; then
-    sudo apt-get install -y coreutils-from-gnu coreutils-from-uutils- \
-        --allow-remove-essential
-fi
-
 sudo apt-get install -y{{ range $pkg := splitList "\n" (includeTemplate ".apt-packages" .) }}{{ if $pkg }} {{ $pkg }}{{ end }}{{ end }}
 
 # node/npm: respect an existing installation (e.g. NodeSource, which bundles
@@ -29,6 +20,15 @@ fi
 # lazygit is missing from older releases; best effort only
 sudo apt-get install -y lazygit >/dev/null 2>&1 || \
     echo "NOTE: lazygit not available in this release, skipping"
+
+# Resolute+ defaults to Rust coreutils (uutils); restore GNU coreutils.
+# Both provider packages only exist on recent Ubuntu releases, so older
+# releases and Debian skip this automatically.
+if apt-cache show coreutils-from-gnu >/dev/null 2>&1 && \
+   apt-cache show coreutils-from-uutils >/dev/null 2>&1; then
+    sudo apt-get install -y coreutils-from-gnu coreutils-from-uutils- \
+        --allow-remove-essential
+fi
 
 # Distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for current LazyVim.
 # Install 'bob' (nvim version manager); the nvim shim lands in ~/bin, which
