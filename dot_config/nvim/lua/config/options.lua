@@ -25,11 +25,14 @@ vim.opt.softtabstop = 8
 vim.opt.tabstop = 8
 vim.opt.undofile = true
 
--- Copy yanked lines to clipboard, even through SSH
+-- On ssh hosts, forward every yank to the local machine's clipboard via
+-- OSC 52 (copy on the remote -> paste on the mac). Do NOT set
+-- clipboard=unnamedplus here: it makes p read the system clipboard, which
+-- over ssh/tmux pastes whatever was copied on the mac, inline and charwise,
+-- instead of the classic linewise put below the cursor.
 local sysname = vim.uv.os_uname().sysname:lower() or ""
 
 if sysname ~= "darwin" then
-  vim.o.clipboard = "unnamedplus"
   vim.api.nvim_create_autocmd("TextYankPost", {
     callback = function()
       -- vim.highlight.on_yank()
