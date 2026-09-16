@@ -4,6 +4,15 @@ My dotfiles, managed with [chezmoi](https://www.chezmoi.io/).
 
 ## Bootstrap a new machine
 
+On distros without a chezmoi package (e.g. Debian trixie), install the
+binary first:
+
+```sh
+sudo sh -c 'curl -sfL https://get.chezmoi.io | sh -s -- -b /usr/local/bin'
+# or, without sudo (~/bin is in PATH via prezto):
+curl -sfL https://get.chezmoi.io | sh -s -- -b "$HOME/bin"
+```
+
 1. Install chezmoi, then:
 
 ```sh
