@@ -1,8 +1,8 @@
 {{- if and (eq .chezmoi.os "freebsd") .desktop -}}
 #!/bin/sh
-# onchange: {{ include ".polkit-60-garga.rules" . | sha256sum }}
+# onchange: {{ includeTemplate ".polkit-60-garga.rules" . | sha256sum }}
 set -e
 sudo mkdir -p /usr/local/etc/polkit-1/rules.d
 sudo tee /usr/local/etc/polkit-1/rules.d/60-garga.rules >/dev/null <<'RULES'
-{{ include ".polkit-60-garga.rules" . }}RULES
+{{ includeTemplate ".polkit-60-garga.rules" . }}RULES
 {{- end -}}

@@ -1,7 +1,5 @@
 #!/bin/sh
 
-echo "$@" >> /tmp/debug
-
 action=$1
 
 case "$action" in
