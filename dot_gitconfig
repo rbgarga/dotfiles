@@ -12,7 +12,6 @@
 	default = simple
 [alias]
 	co = checkout
-	ctags = !.git/hooks/ctags
 	chp = cherry-pick
 [filter "hawser"]
 	clean = git hawser clean %f

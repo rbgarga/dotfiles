@@ -38,8 +38,15 @@ minimal config. To add a machine, add its short hostname to the map:
 -}}
 ```
 
+The map also holds a `$poudriere` list with the hosts running the
+poudriere nginx frontend — only those get `/usr/local/etc/nginx/nginx.conf`.
+
+**After editing the map, run `chezmoi init` once on the affected hosts** —
+the config template only renders at init; `chezmoi update` alone will not
+re-evaluate it.
+
 `.chezmoiignore` uses the profile and OS to decide which files are
-installed (e.g. sway/i3status/wallpapers only on desktop hosts,
+installed (e.g. sway/i3status only on FreeBSD desktop hosts,
 XCompose/login_conf only on FreeBSD).
 
 ## Toolchain
@@ -92,9 +99,11 @@ chezmoi diff       # preview pending changes
 
 - `dot_config/nvim/` — LazyVim config (extras in `lazyvim.json`)
 - `dot_vimrc`, `dot_vim/` — legacy vim fallback, still deployed everywhere
-- `dot_bin/` — helper scripts; `hook_ctags.sh` is kept but no longer
-  wired into git template hooks
-- `.chezmoiscripts/` — onetime/onchange system tweaks (polkit rules and the
-  poudriere nginx config on FreeBSD; the nginx config is templated with each
-  host's FQDN)
+- `bin/` — helper scripts, deployed to `~/bin` as executables
+  (`executable_*` sources); `hook_ctags.sh` is kept but no longer wired
+  into git template hooks
+- `.chezmoiscripts/` — hashed package installers per OS, the daily tmux
+  config reload, and FreeBSD desktop system tweaks (polkit rules and the
+  poudriere nginx config, templated with each host's FQDN and gated on the
+  `poudriere` flag)
 - `pkg_list` — reference file, not installed
