@@ -1,4 +1,4 @@
-# myconf
+# dotfiles
 
 My dotfiles, managed with [chezmoi](https://www.chezmoi.io/).
 
@@ -16,7 +16,7 @@ curl -sfL https://get.chezmoi.io | sh -s -- -b "$HOME/bin"
 1. Install chezmoi, then:
 
 ```sh
-chezmoi init --apply git@github.com:rbgarga/myconf.git
+chezmoi init --apply git@github.com:rbgarga/dotfiles.git
 ```
 
 chezmoi clones prezto (`rbgarga/prezto`) into `~/.zprezto` and links the
