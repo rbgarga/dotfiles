@@ -5,6 +5,7 @@ pkg_list
 {{ if ne .chezmoi.os "freebsd" }}
 .XCompose
 .login_conf
+.wallpaper.jpg
 .config/sway
 .config/i3status-config
 bin/update_freebsd.sh
@@ -14,6 +15,7 @@ bin/launcher.sh
 
 {{ if not (default false .desktop) }}
 .XCompose
+.wallpaper.jpg
 .config/ghostty
 .config/sway
 .config/i3status-config

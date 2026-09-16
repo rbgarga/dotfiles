@@ -25,8 +25,8 @@ set $menu dmenu-wl_path | dmenu-wl | xargs swaymsg exec --
 
 ### Output configuration
 #
-# Default wallpaper (more resolutions are available in /usr/local/share/backgrounds/sway/)
-output * bg /usr/local/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill
+# Personal wallpaper (deployed as ~/.wallpaper.jpg by chezmoi)
+output * bg ~/.wallpaper.jpg fill
 #
 # Example configuration:
 #
