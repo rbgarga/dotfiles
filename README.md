@@ -84,7 +84,9 @@ Terminal notes: nvim mouse selection requires mouse reporting enabled in the
 terminal (iTerm2 enables it by default; make sure "Disable session-initiated
 mouse reporting" is off, and that "Automatically Enable Alternate Mouse
 Scroll" isn't intercepting wheel events). The Ghostty config is deployed on
-desktop hosts via `~/.config/ghostty/config`.
+desktop hosts via `~/.config/ghostty/config`. Inside tmux, clicking a URL
+requires `shift+cmd+click`: the shift keeps ghostty from forwarding the
+mouse event to tmux, letting it detect and open the link on the mac.
 
 ## Updating
 
