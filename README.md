@@ -86,7 +86,10 @@ mouse reporting" is off, and that "Automatically Enable Alternate Mouse
 Scroll" isn't intercepting wheel events). The Ghostty config is deployed on
 desktop hosts via `~/.config/ghostty/config`. Inside tmux, clicking a URL
 requires `shift+cmd+click`: the shift keeps ghostty from forwarding the
-mouse event to tmux, letting it detect and open the link on the mac.
+mouse event to tmux, letting it detect and open the link on the mac. For
+URLs wrapped across lines inside tmux, use the URL picker (`prefix+u` or
+`M-u`): it lists every URL in the pane scrollback and copies the picked
+one to the mac clipboard via OSC 52.
 
 ## Updating
 
