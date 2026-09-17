@@ -16,5 +16,6 @@ ruff
 shfmt
 stylua
 taplo
+zsh
 tree-sitter-cli
 unzip

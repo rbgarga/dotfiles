@@ -1,0 +1,10 @@
+# ~/.bash_profile - the login shell is managed by IT's saltstack and resets
+# to bash. Hand interactive login shells off to zsh (exec replaces the bash
+# process). Non-interactive sessions (scp, rsync, ssh <command>, salt runs)
+# never read this file and stay untouched.
+
+if shopt -q login_shell 2>/dev/null && \
+   [[ $- == *i* ]] && \
+   command -v zsh >/dev/null 2>&1; then
+    exec zsh -l
+fi

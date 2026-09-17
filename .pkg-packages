@@ -12,6 +12,7 @@ lazygit
 lua-language-server
 neocmakelsp
 neovim
+zsh
 node
 npm
 php85

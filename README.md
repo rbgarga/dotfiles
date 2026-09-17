@@ -49,6 +49,11 @@ re-evaluate it.
 installed (e.g. sway/i3status only on FreeBSD desktop hosts,
 XCompose/login_conf only on FreeBSD).
 
+**Shell handoff**: machines whose login shell is managed by IT's
+saltstack (reset to bash) load zsh automatically via `~/.bash_profile`
+— interactive login shells `exec zsh -l`; non-interactive sessions
+(scp, rsync, `ssh <command>`, salt runs) stay in bash.
+
 ## Toolchain
 
 `chezmoi apply` installs the LazyVim toolchain automatically (hashed
