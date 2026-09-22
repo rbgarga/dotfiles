@@ -31,12 +31,9 @@ if apt-cache show coreutils-from-gnu >/dev/null 2>&1 && \
 fi
 
 # Distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for current LazyVim.
-# Install 'bob' (nvim version manager); the nvim shim lands in ~/bin, which
+# Install 'bob' (nvim version manager); the nvim shim lands in ~/.local/bin, which
 # precedes /usr/bin in PATH (prezto zprofile).
-if [ ! -d "$HOME/bin" ]; then
-    rm -f "$HOME/bin"   # dangling symlink or stray file from the old install.sh
-    mkdir -p "$HOME/bin"
-fi
+mkdir -p "$HOME/.local/bin"
 # Pin a specific bob release and verify its checksum before running it;
 # upgrades are deliberate edits to this block
 bobver=v4.1.7
@@ -52,10 +49,10 @@ echo "$sum  /tmp/bob.zip" | sha256sum -c - >/dev/null || {
     exit 1
 }
 unzip -oq /tmp/bob.zip -d /tmp/bob-extract
-mv -f "$(find /tmp/bob-extract -type f -name bob | head -1)" "$HOME/bin/bob"
-chmod 0755 "$HOME/bin/bob"
+mv -f "$(find /tmp/bob-extract -type f -name bob | head -1)" "$HOME/.local/bin/bob"
+chmod 0755 "$HOME/.local/bin/bob"
 rm -rf /tmp/bob.zip /tmp/bob-extract
 
-"$HOME/bin/bob" install stable
-"$HOME/bin/bob" use stable
+"$HOME/.local/bin/bob" install stable
+"$HOME/.local/bin/bob" use stable
 {{- end -}}

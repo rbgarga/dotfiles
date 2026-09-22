@@ -12,9 +12,9 @@ pkg_list
 .wallpaper.jpg
 .config/sway
 .config/i3status-config
-bin/update_freebsd.sh
-bin/vol.sh
-bin/launcher.sh
+.local/bin/update_freebsd.sh
+.local/bin/vol.sh
+.local/bin/launcher.sh
 {{ end }}
 
 {{ if not (default false .desktop) }}
@@ -23,6 +23,6 @@ bin/launcher.sh
 .config/ghostty
 .config/sway
 .config/i3status-config
-bin/vol.sh
-bin/launcher.sh
+.local/bin/vol.sh
+.local/bin/launcher.sh
 {{ end }}

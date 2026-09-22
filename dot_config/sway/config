@@ -272,16 +272,16 @@ for_window [app_id="Slack"] layout tabbed
 for_window [app_id="org.telegram"] layout tabbed
 for_window [app_id="weechat"] layout tabbed
 
-set $thunderbird_cmd "~/bin/launcher.sh -c thunderbird -C /usr/local/bin/thunderbird"
-set $firefox_cmd "~/bin/launcher.sh -c firefox -C /usr/local/bin/firefox"
-set $weechat_cmd "~/bin/launcher.sh -c weechat -C ~/bin/weechat.sh -t"
-set $telegram_cmd "~/bin/launcher.sh -c org.telegram -C /usr/local/bin/telegram-desktop"
-set $slack_cmd "~/bin/launcher.sh -c Slack -C '/usr/local/bin/midori --name Slack -a https://netgate.slack.com'"
-set $whatsapp_cmd "~/bin/launcher.sh -c WhatsApp -C '/usr/local/bin/midori --name WhatsApp -a https://web.whatsapp.com'"
+set $thunderbird_cmd "~/.local/bin/launcher.sh -c thunderbird -C /usr/local/bin/thunderbird"
+set $firefox_cmd "~/.local/bin/launcher.sh -c firefox -C /usr/local/bin/firefox"
+set $weechat_cmd "~/.local/bin/launcher.sh -c weechat -C ~/.local/bin/weechat.sh -t"
+set $telegram_cmd "~/.local/bin/launcher.sh -c org.telegram -C /usr/local/bin/telegram-desktop"
+set $slack_cmd "~/.local/bin/launcher.sh -c Slack -C '/usr/local/bin/midori --name Slack -a https://netgate.slack.com'"
+set $whatsapp_cmd "~/.local/bin/launcher.sh -c WhatsApp -C '/usr/local/bin/midori --name WhatsApp -a https://web.whatsapp.com'"
 
-bindsym XF86AudioMute exec --no-startup-id "~/bin/vol.sh toggle"
-bindsym XF86AudioRaiseVolume exec --no-startup-id "~/bin/vol.sh up"
-bindsym XF86AudioLowerVolume exec --no-startup-id "~/bin/vol.sh down"
+bindsym XF86AudioMute exec --no-startup-id "~/.local/bin/vol.sh toggle"
+bindsym XF86AudioRaiseVolume exec --no-startup-id "~/.local/bin/vol.sh up"
+bindsym XF86AudioLowerVolume exec --no-startup-id "~/.local/bin/vol.sh down"
 bindsym XF86MonBrightnessUp exec --no-startup-id "backlight incr"
 bindsym XF86MonBrightnessDown exec --no-startup-id "backlight decr"
 

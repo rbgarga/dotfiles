@@ -9,8 +9,8 @@ binary first:
 
 ```sh
 sudo sh -c 'curl -sfL https://get.chezmoi.io | sh -s -- -b /usr/local/bin'
-# or, without sudo (~/bin is in PATH via prezto):
-curl -sfL https://get.chezmoi.io | sh -s -- -b "$HOME/bin"
+# or, without sudo (~/.local/bin is in PATH via prezto):
+curl -sfL https://get.chezmoi.io | sh -s -- -b "$HOME/.local/bin"
 ```
 
 1. Install chezmoi, then:
@@ -78,8 +78,8 @@ file with a single `Include ~/.ssh/agent_forward` line.
   here.
 - **Ubuntu/Debian**: `apt-get` (`.apt-packages`) plus `bob`, the nvim version
   manager, since distro nvim (noble: 0.9.x, trixie: 0.10.x) is too old for
-  current LazyVim. bob lives in `~/bin` and `bob use stable` leaves the
-  active nvim shim in `~/bin`, ahead of `/usr/bin` in PATH (prezto zprofile).
+  current LazyVim. bob lives in `~/.local/bin` and `bob use stable` leaves the
+  active nvim shim in `~/.local/bin`, ahead of `/usr/bin` in PATH (prezto zprofile).
   An existing node installation (e.g. NodeSource, which bundles npm and
   conflicts with the distro `npm` package) is detected and respected.
 - **Chimera Linux**: `apk add` (`.apk-packages`) via `doas` (falls back to
@@ -117,8 +117,8 @@ chezmoi diff       # preview pending changes
 
 - `dot_config/nvim/` — LazyVim config (extras in `lazyvim.json`)
 - `dot_vimrc`, `dot_vim/` — legacy vim fallback, still deployed everywhere
-- `bin/` — helper scripts, deployed to `~/bin` as executables
-  (`executable_*` sources); `hook_ctags.sh` is kept but no longer wired
+- `dot_local/bin/` — helper scripts, deployed to `~/.local/bin` as executables
+  (`~/bin` is no longer in PATH); `hook_ctags.sh` is kept but no longer wired
   into git template hooks
 - `.chezmoiscripts/` — hashed package installers per OS, the daily tmux
   config reload, and FreeBSD desktop system tweaks (polkit rules and the
