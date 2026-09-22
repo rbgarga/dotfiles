@@ -1,0 +1,7 @@
+# Generated from the chezmoi host map: ssh-profile hosts get the mac's
+# agent; desktops (m2, e14) hold the private keys. Edit the map in
+# .chezmoi.toml.tmpl, not this file, and run `chezmoi init` after edits.
+{{- if hasKey . "hosts" }}
+Host{{ range $host, $profile := .hosts }}{{ if ne $profile "desktop" }} {{ $host }}{{ end }}{{ end }}
+  ForwardAgent yes
+{{- end }}

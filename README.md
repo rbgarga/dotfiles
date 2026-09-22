@@ -54,6 +54,14 @@ saltstack (reset to bash) load zsh automatically via `~/.bash_profile`
 — interactive login shells `exec zsh -l`; non-interactive sessions
 (scp, rsync, `ssh <command>`, salt runs) stay in bash.
 
+**SSH agent forwarding**: private keys live only on desktop-profile
+hosts (m2, e14). Every ssh-profile host gets `ForwardAgent yes` via
+`~/.ssh/agent_forward`, generated from the host map — add a host to
+the map, run `chezmoi init` on the affected machines, and the
+forwarding list updates itself. The mac's `~/.ssh/config` (local,
+unmanaged: it contains internal addresses) includes the generated
+file with a single `Include ~/.ssh/agent_forward` line.
+
 ## Toolchain
 
 `chezmoi apply` installs the LazyVim toolchain automatically (hashed
