@@ -115,6 +115,12 @@ chezmoi cd         # jump to the source repo
 chezmoi diff       # preview pending changes
 ```
 
+`dot_config/nvim/lazy-lock.json` is versioned so every machine
+converges on the same plugin commits and fresh installs check out
+exact revisions (immune to upstream tag/branch churn and to GitHub
+API rate limits). After an intentional `:Lazy sync` in nvim, run
+`chezmoi add ~/.config/nvim/lazy-lock.json` and commit the lock.
+
 ## Layout notes
 
 - `dot_config/nvim/` — LazyVim config (extras in `lazyvim.json`)
