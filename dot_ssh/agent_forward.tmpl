@@ -5,3 +5,7 @@
 Host{{ range $host, $profile := .hosts }}{{ if ne $profile "desktop" }} {{ $host }}{{ end }}{{ end }}
   ForwardAgent yes
 {{- end }}
+{{- if hasKey . "forward_extra" }}
+Host{{ range $h := .forward_extra }} {{ $h }}{{ end }}
+  ForwardAgent yes
+{{- end }}

@@ -27,6 +27,9 @@
     desktop = {{ eq $profile "desktop" }}
     poudriere = {{ has $host $poudriere }}
 
+    # Extra hosts (not chezmoi machines) that also get agent forwarding
+    forward_extra = ["tnsr-build-*"]
+
     # Full hostname -> profile map. Consumed by ~/.ssh/agent_forward:
     # ssh-profile hosts get agent forwarding, desktops hold the keys.
     [data.hosts]
