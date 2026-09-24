@@ -53,9 +53,27 @@ mv -f "$(find /tmp/bob-extract -type f -name bob | head -1)" "$HOME/.local/bin/b
 chmod 0755 "$HOME/.local/bin/bob"
 rm -rf /tmp/bob.zip /tmp/bob-extract
 
+# bob prompts interactively to symlink ~/.local/bin/nvim ("Add bob-managed
+# Neovim binary to your $PATH automatically?", default: prompt on first
+# use) and skips it when stdin is not a TTY. Answer it via bob's own
+# config so bob creates the symlink itself.
+python3 <<'PYEOF'
+import json, os
+path = os.path.expanduser("~/.config/bob/config.json")
+os.makedirs(os.path.dirname(path), exist_ok=True)
+cfg = {}
+if os.path.exists(path):
+    try:
+        cfg = json.load(open(path))
+    except (ValueError, OSError):
+        os.rename(path, path + ".bad")
+cfg["add_neovim_binary_to_path"] = True
+open(path, "w").write(json.dumps(cfg, indent=2) + "\n")
+PYEOF
+
 "$HOME/.local/bin/bob" install stable
 "$HOME/.local/bin/bob" use stable
 
-# bob 4.x does not create the nvim shim itself; symlink it into PATH
+# Fallback: if bob did not create the symlink itself, symlink it into PATH
 ln -sf "$HOME/.local/share/bob/nvim-bin/nvim" "$HOME/.local/bin/nvim"
 {{- end -}}
