@@ -55,4 +55,7 @@ rm -rf /tmp/bob.zip /tmp/bob-extract
 
 "$HOME/.local/bin/bob" install stable
 "$HOME/.local/bin/bob" use stable
+
+# bob 4.x does not create the nvim shim itself; symlink it into PATH
+ln -sf "$HOME/.local/share/bob/nvim-bin/nvim" "$HOME/.local/bin/nvim"
 {{- end -}}
