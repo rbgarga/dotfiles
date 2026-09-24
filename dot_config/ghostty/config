@@ -71,6 +71,10 @@ copy-on-select = clipboard
 clipboard-paste-protection = false
 clipboard-trim-trailing-spaces = true
 
+# Quick terminal (quake-style dropdown from the top edge)
+keybind = ctrl+shift+space=toggle_quick_terminal
+keybind = global:ctrl+shift+space=toggle_quick_terminal
+
 # Forward Cmd+PgUp/PgDn to the app as Alt+PgUp/PgDn (tmux binds these for
 # pane history scrolling); overrides ghostty's local Cmd+PgUp scrollback
 keybind = super+page_up=text:\x1b[5;3~
