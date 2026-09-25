@@ -26,3 +26,8 @@ pkg_list
 .local/bin/vol.sh
 .local/bin/launcher.sh
 {{ end }}
+
+# opencode agent rules: desktops and garga-*-dev boxes
+{{ if not (or (default false .desktop) (regexMatch "^garga-.+-dev$" .chezmoi.hostname)) }}
+.config/opencode/AGENTS.md
+{{ end }}
