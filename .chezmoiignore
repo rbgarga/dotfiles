@@ -9,6 +9,7 @@ pkg_list
 {{ if ne .chezmoi.os "freebsd" }}
 .XCompose
 .login_conf
+.profile
 .wallpaper.jpg
 .config/sway
 .config/i3status-config

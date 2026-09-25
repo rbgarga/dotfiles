@@ -1,0 +1,13 @@
+# ~/.profile - the login shell is managed by provisioning and resets to
+# /bin/sh on machines like the pfsense build boxes, so chsh does not
+# stick. Hand interactive login shells off to zsh (exec replaces the sh
+# process). Non-interactive sessions (scp, rsync, ssh <command>,
+# provisioning runs) hit the interactive guard and stay in sh.
+
+case $- in
+*i*)
+    if [ -z "$ZSH_VERSION" ] && command -v zsh >/dev/null 2>&1; then
+        exec zsh -l
+    fi
+    ;;
+esac
