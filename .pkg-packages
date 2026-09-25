@@ -10,7 +10,9 @@ gopls
 hs-ShellCheck
 lazygit
 lua-language-server
+{{ if eq .chezmoi.arch "amd64" }}
 neocmakelsp
+{{ end }}
 neovim
 zsh
 node
