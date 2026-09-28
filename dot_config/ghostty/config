@@ -11,6 +11,9 @@ window-inherit-working-directory = false
 tab-inherit-working-directory = false
 split-inherit-working-directory = false
 
+# New tabs go to the end of the tab list, not next to the current one
+window-new-tab-position = end
+
 # Do not move cursor on mouse click
 cursor-click-to-move = false
 
