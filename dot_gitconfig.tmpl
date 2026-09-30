@@ -42,3 +42,8 @@
 	cmd = "nvim  -d $MERGED $LOCAL $BASE $REMOTE -c 'wincmd J | wincmd ='"
 [rerere]
 	enabled = true
+{{ if eq .chezmoi.os "freebsd" }}
+[safe]
+	directory = /usr/ports
+	directory = /usr/src
+{{ end }}
