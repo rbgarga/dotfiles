@@ -17,7 +17,8 @@ neovim
 zsh
 node
 npm
-php85
+{{ if or (eq .chezmoi.hostname "e14") (eq .chezmoi.hostname "garga-freebsd-dev") }}arcanist-php84
+php84{{ else }}php85{{ end }}
 python3
 ripgrep
 ruff
