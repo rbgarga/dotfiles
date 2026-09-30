@@ -36,10 +36,10 @@ fi
 mkdir -p "$HOME/.local/bin"
 # Pin a specific bob release and verify its checksum before running it;
 # upgrades are deliberate edits to this block
-bobver=v4.1.7
+bobver=v4.2.0
 case "{{ .chezmoi.arch }}" in
-    amd64) asset=bob-linux-x86_64.zip; sum=a3e125379a99e4a82faf2c335c6fb85de694a112cf32ab085c10dd59dffd0a78 ;;
-    arm64) asset=bob-linux-arm.zip; sum=dc9286bc169f25c3eda633e44ea12b2bc6e18d8f2d096c670fd34929bc4e4ec9 ;;
+    amd64) asset=bob-linux-x86_64.zip; sum=c5eb4341f10030eab6aa5ea7363afbee27d1c0835dba29447d3150ebab8f3f1a ;;
+    arm64) asset=bob-linux-arm.zip; sum=60f9739b3450c6d8c28067e7b88126442dde1d97c614c7c621109e0260b9bae3 ;;
     *) echo "ERROR: unsupported architecture {{ .chezmoi.arch }}" >&2; exit 1 ;;
 esac
 curl -fsSL -o /tmp/bob.zip "https://github.com/MordechaiHadad/bob/releases/download/$bobver/$asset"
