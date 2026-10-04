@@ -1,6 +1,13 @@
-# Generated from the chezmoi host map: ssh-profile hosts get the mac's
-# agent; desktops (m2, e14) hold the private keys. Edit the map in
-# .chezmoi.toml.tmpl, not this file, and run `chezmoi init` after edits.
+{{- /* Agent forwarding is disabled by default: a forwarded agent lets root on
+       the remote host sign with the mac's keys. To re-enable, set
+       forward_agent = true under [data] in .chezmoi.toml.tmpl and run
+       `chezmoi init`. Hosts that have not re-run `chezmoi init` lack the key,
+       hence the hasKey guard. */ -}}
+{{- $forward := and (hasKey . "forward_agent") .forward_agent -}}
+# Generated from the chezmoi host map. Agent forwarding is {{ if $forward }}enabled{{ else }}disabled{{ end }}.
+# Edit the map in .chezmoi.toml.tmpl, not this file, and run `chezmoi init` after edits.
+{{- if $forward }}
+# ssh-profile hosts get the mac's agent; desktops (m2, e14) hold the private keys.
 {{- if hasKey . "hosts" }}
 Host{{ range $host, $profile := .hosts }}{{ if ne $profile "desktop" }} {{ $host }}{{ end }}{{ end }}
   ForwardAgent yes
@@ -8,4 +15,5 @@ Host{{ range $host, $profile := .hosts }}{{ if ne $profile "desktop" }} {{ $host
 {{- if hasKey . "forward_extra" }}
 Host{{ range $h := .forward_extra }} {{ $h }}{{ end }}
   ForwardAgent yes
+{{- end }}
 {{- end }}

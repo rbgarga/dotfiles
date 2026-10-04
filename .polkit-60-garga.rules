@@ -1,13 +1,13 @@
 polkit.addRule(function (action, subject) {
   if ((action.id == "org.freedesktop.consolekit.system.restart" ||
       action.id == "org.freedesktop.consolekit.system.stop")
-      && subject.user == "garga") {
+      && subject.user == "garga" && subject.local && subject.active) {
     return polkit.Result.YES;
   }
 });
 polkit.addRule(function (action, subject) {
   if (action.id == "org.freedesktop.consolekit.system.suspend"
-      && subject.user == "garga") {
+      && subject.user == "garga" && subject.local && subject.active) {
     return polkit.Result.YES;
   }
 });

@@ -68,10 +68,13 @@ cursor-style-blink = true
 mouse-hide-while-typing = true
 
 # Clipboard
-clipboard-read = allow
+# Remote copy (tmux selection, nvim yank over ssh) only needs OSC 52 write.
+# Reads stay behind a prompt so nothing in the terminal can silently read the
+# clipboard; paste protection also guards against OSC 52 clipboard hijacking.
+clipboard-read = ask
 clipboard-write = allow
 copy-on-select = clipboard
-clipboard-paste-protection = false
+clipboard-paste-protection = true
 clipboard-trim-trailing-spaces = true
 
 # Quick terminal (quake-style dropdown from the top edge)

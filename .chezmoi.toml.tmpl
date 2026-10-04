@@ -46,7 +46,12 @@
     desktop = {{ eq $profile "desktop" }}
     poudriere = {{ has $host $poudriere }}
 
+    # SSH agent forwarding is off. Set to true (and run `chezmoi init`) to
+    # generate ForwardAgent entries in ~/.ssh/agent_forward.
+    forward_agent = false
+
     # Extra hosts (not chezmoi machines) that also get agent forwarding
+    # (only used when forward_agent = true)
     forward_extra = ["tnsr-build-*"]
 
     # Full hostname -> profile map. Consumed by ~/.ssh/agent_forward:

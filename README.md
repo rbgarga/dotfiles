@@ -54,15 +54,17 @@ saltstack (reset to bash) load zsh automatically via `~/.bash_profile`
 — interactive login shells `exec zsh -l`; non-interactive sessions
 (scp, rsync, `ssh <command>`, salt runs) stay in bash.
 
-**SSH agent forwarding**: private keys live only on desktop-profile
-hosts (m2, e14). Every ssh-profile host gets `ForwardAgent yes` via
-`~/.ssh/agent_forward`, generated from the host map — add a host to
-the map, run `chezmoi init` on the affected machines, and the
-forwarding list updates itself. Non-chezmoi hosts (e.g. the
-`tnsr-build-*` builders) can be added to the `forward_extra` list in
-`.chezmoi.toml.tmpl`. The mac's `~/.ssh/config` (local, unmanaged:
-it contains internal addresses) includes the generated
-file with a single `Include ~/.ssh/agent_forward` line.
+**SSH agent forwarding**: currently disabled — a forwarded agent lets
+root on the remote host sign with the mac's keys. `~/.ssh/agent_forward`
+(generated from the host map) is still deployed but empty; the mac's
+unmanaged `~/.ssh/config` includes it with a single
+`Include ~/.ssh/agent_forward` line. To re-enable, set
+`forward_agent = true` in `.chezmoi.toml.tmpl` and run `chezmoi init`
+on the affected machines: every ssh-profile host then gets
+`ForwardAgent yes` (private keys live only on desktop-profile hosts,
+m2 and e14), plus the non-chezmoi hosts listed in `forward_extra`
+(e.g. the `tnsr-build-*` builders). Prefer `ProxyJump` or
+destination-constrained keys (`ssh-add -h`) over blanket forwarding.
 
 ## Toolchain
 

@@ -42,16 +42,16 @@ case "{{ .chezmoi.arch }}" in
     arm64) asset=bob-linux-arm.zip; sum=60f9739b3450c6d8c28067e7b88126442dde1d97c614c7c621109e0260b9bae3 ;;
     *) echo "ERROR: unsupported architecture {{ .chezmoi.arch }}" >&2; exit 1 ;;
 esac
-curl -fsSL -o /tmp/bob.zip "https://github.com/MordechaiHadad/bob/releases/download/$bobver/$asset"
-echo "$sum  /tmp/bob.zip" | sha256sum -c - >/dev/null || {
+bobtmp=$(mktemp -d)
+trap 'rm -rf "$bobtmp"' EXIT
+curl -fsSL -o "$bobtmp/bob.zip" "https://github.com/MordechaiHadad/bob/releases/download/$bobver/$asset"
+echo "$sum  $bobtmp/bob.zip" | sha256sum -c - >/dev/null || {
     echo "ERROR: bob checksum mismatch, aborting" >&2
-    rm -f /tmp/bob.zip
     exit 1
 }
-unzip -oq /tmp/bob.zip -d /tmp/bob-extract
-mv -f "$(find /tmp/bob-extract -type f -name bob | head -1)" "$HOME/.local/bin/bob"
+unzip -oq "$bobtmp/bob.zip" -d "$bobtmp/extract"
+mv -f "$(find "$bobtmp/extract" -type f -name bob | head -1)" "$HOME/.local/bin/bob"
 chmod 0755 "$HOME/.local/bin/bob"
-rm -rf /tmp/bob.zip /tmp/bob-extract
 
 # bob prompts interactively to symlink ~/.local/bin/nvim ("Add bob-managed
 # Neovim binary to your $PATH automatically?", default: prompt on first

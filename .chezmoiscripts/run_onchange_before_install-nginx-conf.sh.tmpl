@@ -5,6 +5,8 @@ set -e
 [ -d /usr/local/etc/nginx ] || exit 0
 sudo tee /usr/local/etc/nginx/nginx.conf >/dev/null <<'NGINX'
 {{ includeTemplate ".nginx.conf.tmpl" . }}NGINX
+# Validate before reloading: a bad config must not take the frontend down
+sudo nginx -t
 if sudo service -e nginx >/dev/null 2>&1; then
     sudo service nginx reload
 fi
