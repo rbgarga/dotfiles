@@ -1,9 +1,12 @@
 {{/* chezmoi:modify-template */}}
 {{- /* Claude Code rewrites settings.json itself (model, permissions, ...),
-       so only pin the keys managed here and keep everything else. */ -}}
+       so only set the keys managed here and keep everything else. The theme
+       is only a default: a theme picked later with /theme is kept. */ -}}
 {{- $settings := dict -}}
 {{- if .chezmoi.stdin -}}
 {{-   $settings = fromJson .chezmoi.stdin -}}
 {{- end -}}
-{{- $_ := set $settings "theme" "custom:gruvbox" -}}
+{{- if or (not (hasKey $settings "theme")) (eq (get $settings "theme") "auto") -}}
+{{-   $_ := set $settings "theme" "custom:gruvbox" -}}
+{{- end -}}
 {{ toPrettyJson $settings | trim }}

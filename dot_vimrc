@@ -9,6 +9,10 @@ set t_RV=
 
 set nocompatible
 
+" vim-plug is not bootstrapped here: without it (or without the plugins)
+" skip them instead of erroring on every start
+let s:has_plug = filereadable(expand('~/.vim/autoload/plug.vim'))
+if s:has_plug
 call plug#begin()
 
 Plug 'cohama/lexima.vim'
@@ -30,6 +34,7 @@ Plug 'vim-airline/vim-airline-themes'
 Plug 'vim-scripts/taglist.vim'
 
 call plug#end()
+endif
 
 " Enable syntax
 syntax on
@@ -92,7 +97,7 @@ nnoremap <M-Left> :bp<cr>
 nnoremap <c-x> :bp\|bd #<cr>
 
 " Define colorscheme
-colorscheme gruvbox
+silent! colorscheme gruvbox
 
 " Configure taglist
 let Tlist_Exit_OnlyWindow = 1
@@ -170,4 +175,6 @@ map ,p CRubicon Communications, LLC ("Netgate")<ESC>
 
 nmap gm :LivedownToggle<CR>
 
-source ~/.vim/coc.vimrc
+if s:has_plug && isdirectory(expand('~/.vim/plugged/coc.nvim'))
+    source ~/.vim/coc.vimrc
+endif

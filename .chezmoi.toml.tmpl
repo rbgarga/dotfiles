@@ -32,7 +32,12 @@
       "tnsr-build-ubuntu-arm64-3" "ssh"
       "tnsr-build-ubuntu-arm64-4" "ssh"
 -}}
+{{- /* macOS: the DHCP-assigned hostname changes with the network (mac vs
+   m2), so key the map on the stable Bonjour name instead */ -}}
 {{- $host := .chezmoi.hostname -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $host = output "scutil" "--get" "LocalHostName" | trim -}}
+{{- end -}}
 {{- $profile := "ssh" -}}
 {{- if hasKey $profiles $host -}}
 {{- $profile = index $profiles $host -}}

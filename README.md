@@ -29,7 +29,9 @@ into `$HOME`.
 
 `.chezmoi.toml.tmpl` holds a central hostname → profile map
 (`desktop` or `ssh`). Unknown hosts default to `ssh`, which gets the
-minimal config. To add a machine, add its short hostname to the map:
+minimal config. To add a machine, add its short hostname to the map
+(on macOS the key is the Bonjour `LocalHostName`, not the DHCP-assigned
+hostname, which changes with the network):
 
 ```go
 {{- $profiles := dict

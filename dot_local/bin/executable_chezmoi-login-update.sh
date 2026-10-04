@@ -18,8 +18,13 @@ fi
 [ -z "$(find "$stamp" -mtime +0 2>/dev/null)" ] && exit 0
 
 touch "$stamp"   # claim early: concurrent logins cannot race
+log=$HOME/.cache/chezmoi-update.log
+# keep the log bounded: trim to the last 200 lines once it passes 100 KB
+if [ -f "$log" ] && [ "$(wc -c < "$log")" -gt 102400 ]; then
+    tail -n 200 "$log" > "$log.tmp" && mv "$log.tmp" "$log"
+fi
 {
     echo "=== $(date)"
     chezmoi update
     echo "=== exit=$?"
-} >> "$HOME/.cache/chezmoi-update.log" 2>&1
+} >> "$log" 2>&1
