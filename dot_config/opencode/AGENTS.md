@@ -2,6 +2,8 @@
 
 ## Git and merge requests
 
+- Git commit messages must always be in English and respect maximum
+  of 72 columns
 - Never push to `main` or `master`. Always work on a feature branch.
 - Never push commits before the user has reviewed the local diff and
   commit message and approved.

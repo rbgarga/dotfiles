@@ -1,0 +1,9 @@
+{{/* chezmoi:modify-template */}}
+{{- /* Claude Code rewrites settings.json itself (model, permissions, ...),
+       so only pin the keys managed here and keep everything else. */ -}}
+{{- $settings := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $settings = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- $_ := set $settings "theme" "custom:gruvbox" -}}
+{{ toPrettyJson $settings | trim }}
