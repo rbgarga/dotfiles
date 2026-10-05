@@ -56,17 +56,17 @@ saltstack (reset to bash) load zsh automatically via `~/.bash_profile`
 — interactive login shells `exec zsh -l`; non-interactive sessions
 (scp, rsync, `ssh <command>`, salt runs) stay in bash.
 
-**SSH agent forwarding**: currently disabled — a forwarded agent lets
-root on the remote host sign with the mac's keys. `~/.ssh/agent_forward`
-(generated from the host map) is still deployed but empty; the mac's
-unmanaged `~/.ssh/config` includes it with a single
-`Include ~/.ssh/agent_forward` line. To re-enable, set
-`forward_agent = true` in `.chezmoi.toml.tmpl` and run `chezmoi init`
-on the affected machines: every ssh-profile host then gets
-`ForwardAgent yes` (private keys live only on desktop-profile hosts,
-m2 and e14), plus the non-chezmoi hosts listed in `forward_extra`
-(e.g. the `tnsr-build-*` builders). Prefer `ProxyJump` or
-destination-constrained keys (`ssh-add -h`) over blanket forwarding.
+**SSH agent forwarding**: enabled — remote hosts use the mac's agent to
+clone from gitlab.netgate.com, so every ssh-profile host gets
+`ForwardAgent yes` via `~/.ssh/agent_forward` (private keys live only on
+desktop-profile hosts, m2 and e14), plus the non-chezmoi hosts listed in
+`forward_extra` (e.g. the `tnsr-build-*` builders). The mac's unmanaged
+`~/.ssh/config` includes the generated file with a single
+`Include ~/.ssh/agent_forward` line. A forwarded agent lets root on the
+remote host sign with the mac's keys while connected; set
+`forward_agent = false` in `.chezmoi.toml.tmpl` and run `chezmoi init` to
+turn it off. Narrower alternatives: `ProxyJump`, or destination-constrained
+keys (`ssh-add -h`).
 
 ## Toolchain
 

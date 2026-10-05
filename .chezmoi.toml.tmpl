@@ -51,9 +51,10 @@
     desktop = {{ eq $profile "desktop" }}
     poudriere = {{ has $host $poudriere }}
 
-    # SSH agent forwarding is off. Set to true (and run `chezmoi init`) to
-    # generate ForwardAgent entries in ~/.ssh/agent_forward.
-    forward_agent = false
+    # SSH agent forwarding: remote hosts need the mac's agent to clone from
+    # gitlab.netgate.com. Set to false (and run `chezmoi init`) to stop
+    # generating ForwardAgent entries in ~/.ssh/agent_forward.
+    forward_agent = true
 
     # Extra hosts (not chezmoi machines) that also get agent forwarding
     # (only used when forward_agent = true)
