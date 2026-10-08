@@ -56,6 +56,14 @@ saltstack (reset to bash) load zsh automatically via `~/.bash_profile`
 — interactive login shells `exec zsh -l`; non-interactive sessions
 (scp, rsync, `ssh <command>`, salt runs) stay in bash.
 
+**Auto tmux on ssh**: `~/.zlogin` (managed here; it sources prezto's
+`zlogin` first) runs `tmux new-session -A -s main` on interactive ssh
+logins, so every login creates or re-attaches the `main` session, and
+detaching ends the ssh connection. It is skipped inside tmux, without a
+tty (scp, rsync, `ssh <command>`) and when tmux is missing or fails to
+start. To get a plain shell, run
+`ssh -t <host> 'NO_SSH_TMUX=1 zsh -l'`.
+
 **SSH agent forwarding**: enabled — remote hosts use the mac's agent to
 clone from gitlab.netgate.com, so every ssh-profile host gets
 `ForwardAgent yes` via `~/.ssh/agent_forward` (private keys live only on
