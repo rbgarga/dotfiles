@@ -64,6 +64,11 @@ tty (scp, rsync, `ssh <command>`) and when tmux is missing or fails to
 start. To get a plain shell, run
 `ssh -t <host> 'NO_SSH_TMUX=1 zsh -l'`.
 
+For a second, independent session on the same host, `ssh-tmux <session>
+[ssh options] <host>` (in `~/.local/bin`) attaches to the tmux session
+named `<session>` instead of `main` — e.g. `ssh-tmux vnc -L5901:localhost:5929
+<host>`. It works by setting `SSH_TMUX_SESSION` for the remote `~/.zlogin`.
+
 **SSH agent forwarding**: enabled — remote hosts use the mac's agent to
 clone from gitlab.netgate.com, so every ssh-profile host gets
 `ForwardAgent yes` via `~/.ssh/agent_forward` (private keys live only on

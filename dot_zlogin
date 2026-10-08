@@ -2,12 +2,14 @@
 # then drop interactive ssh logins into a shared tmux session.
 [[ -r "$HOME/.zprezto/runcoms/zlogin" ]] && source "$HOME/.zprezto/runcoms/zlogin"
 
-# Attach to (or create) the "main" tmux session on interactive ssh logins.
-# Skipped when already inside tmux, without a tty, without tmux installed,
-# or when NO_SSH_TMUX is set - escape hatch: ssh -t host 'NO_SSH_TMUX=1 zsh -l'.
+# Attach to (or create) a tmux session on interactive ssh logins: "main",
+# or $SSH_TMUX_SESSION for extra independent sessions on the same host
+# (see ssh-tmux in ~/.local/bin). Skipped when already inside tmux, without
+# a tty, without tmux installed, or when NO_SSH_TMUX is set - escape hatch:
+# ssh -t host 'NO_SSH_TMUX=1 zsh -l'.
 # No exec: if tmux fails to start we fall through to a plain shell, and a
 # clean exit (detach or last window closed) ends the ssh session too.
 if [[ -o INTERACTIVE && -n "$SSH_CONNECTION" && -z "$TMUX" && -z "$NO_SSH_TMUX" \
       && -t 0 && -t 1 ]] && (( $+commands[tmux] )); then
-  tmux new-session -A -s main && exit
+  tmux new-session -A -s "${SSH_TMUX_SESSION:-main}" && exit
 fi

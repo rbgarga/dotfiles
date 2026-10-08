@@ -1,0 +1,28 @@
+#!/bin/sh
+# ssh into a host and attach to a named tmux session instead of "main",
+# for when two independent sessions on the same machine are needed.
+# The remote ~/.zlogin reads SSH_TMUX_SESSION (see dot_zlogin).
+#
+# usage: ssh-tmux <session> [ssh options] <host>
+#   ssh-tmux build tnsr-build-ubuntu-amd64-2
+#   ssh-tmux vnc -L5901:localhost:5929 tnsr-build-ubuntu-amd64-2
+
+if [ $# -lt 2 ]; then
+    echo "usage: ${0##*/} <session> [ssh options] <host>" >&2
+    exit 2
+fi
+
+session=$1
+shift
+
+# the name is pasted into a remote shell command: keep it to safe characters
+case $session in
+*[!A-Za-z0-9_.-]* | '')
+    echo "${0##*/}: invalid session name: $session" >&2
+    exit 2
+    ;;
+esac
+
+# PATH: a non-interactive remote shell may lack /usr/local/bin (FreeBSD)
+exec ssh -t "$@" \
+    "PATH=\$PATH:/usr/local/bin:/opt/homebrew/bin SSH_TMUX_SESSION=$session exec zsh -l"
