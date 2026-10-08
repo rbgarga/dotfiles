@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# redmine-get - Read-only access to Redmine REST API
+#
+# Usage: redmine-get <api_path>
+#
+#   redmine-get '/issues.json?project_id=tnsr&status_id=open&limit=25'
+#   redmine-get '/issues/12345.json?include=journals,relations'
+#
+# API key: on macOS it is read from the Keychain, item created with:
+#   security add-generic-password -a "$USER" -s redmine-api-key -w
+# On other systems it is read from a file that only the owner can access
+# (no group/other permissions, otherwise the script refuses to use it):
+#   mkdir -p ~/.config/redmine && chmod 700 ~/.config/redmine
+#   (umask 077; cat > ~/.config/redmine/api-key)
+#
+# The key is sent only in the X-Redmine-API-Key header, passed to curl
+# through stdin so it never shows up in the process list, and it is
+# redacted from the output.  Only GET requests are performed.
+#
+# Environment:
+#   REDMINE_URL           Redmine base URL (https only)
+#   REDMINE_KEYCHAIN_ITEM Keychain service name (default: redmine-api-key)
+#   REDMINE_KEY_FILE      Key file on non-macOS systems
+#                         (default: ~/.config/redmine/api-key)
+
+set -eu
+
+: "${REDMINE_URL:=https://redmine.netgate.com}"
+: "${REDMINE_KEYCHAIN_ITEM:=redmine-api-key}"
+
+die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+[ $# -eq 1 ] || die "usage: $(basename "$0") <api_path>"
+
+path=$1
+
+case "${REDMINE_URL}" in
+	https://*) ;;
+	*) die "REDMINE_URL must use https" ;;
+esac
+REDMINE_URL=${REDMINE_URL%/}
+
+# Only accept a path on the configured server
+case "${path}" in
+	/*) ;;
+	*) die "API path must start with /" ;;
+esac
+case "${path}" in
+	//*|*://*|*[[:space:]]*|*@*|*\\*|*..*)
+		die "invalid API path"
+		;;
+esac
+# Never accept the key as a query parameter
+if printf '%s' "${path}" | grep -qi '[?&]key='; then
+	die "do not pass key in the URL"
+fi
+
+if [ "$(uname -s)" = Darwin ]; then
+	key=$(security find-generic-password -a "${USER}" \
+	    -s "${REDMINE_KEYCHAIN_ITEM}" -w 2>/dev/null) \
+	    || die "API key not found in Keychain (${REDMINE_KEYCHAIN_ITEM})"
+else
+	keyfile=${REDMINE_KEY_FILE:-${XDG_CONFIG_HOME:-${HOME}/.config}/redmine/api-key}
+	[ -f "${keyfile}" ] || die "API key file not found (${keyfile})"
+	# ls is the portable way to read the mode (stat differs on BSD/GNU)
+	# shellcheck disable=SC2012
+	[ "$(ls -ld "${keyfile}" | cut -c5-10)" = "------" ] \
+	    || die "${keyfile} must not be accessible by group or others"
+	key=$(cat "${keyfile}") || die "unable to read ${keyfile}"
+fi
+
+# Redmine API keys are hex strings.  Also protects curl config and sed
+# expression below
+printf '%s' "${key}" | grep -Eq '^[0-9a-fA-F]{20,64}$' \
+    || die "unexpected API key format"
+
+tmp=$(mktemp "${TMPDIR:-/tmp}/redmine-get.XXXXXX") || die "unable to create temporary file"
+trap 'rm -f "${tmp}"' EXIT
+trap 'exit 1' HUP INT TERM
+
+rc=0
+printf 'header = "X-Redmine-API-Key: %s"\n' "${key}" \
+    | curl --config - \
+	--silent --show-error --fail-with-body \
+	--proto '=https' --max-redirs 0 --max-time 60 \
+	--request GET \
+	--header 'Accept: application/json' \
+	--output "${tmp}" \
+	"${REDMINE_URL}${path}" \
+    || rc=$?
+
+# Some endpoints, e.g. /users/current.json, return the key itself
+sed "s/${key}/[REDACTED]/g" "${tmp}"
+
+if [ ${rc} -ne 0 ]; then
+	echo >&2
+	echo "$(basename "$0"): request failed (curl exit ${rc})" >&2
+fi
+exit ${rc}

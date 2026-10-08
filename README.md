@@ -69,6 +69,13 @@ For a second, independent session on the same host, `ssh-tmux <session>
 named `<session>` instead of `main` — e.g. `ssh-tmux vnc -L5901:localhost:5929
 <host>`. It works by setting `SSH_TMUX_SESSION` for the remote `~/.zlogin`.
 
+**Redmine helper**: `~/.local/bin/redmine-get <api_path>` does read-only
+GETs against the Redmine REST API for the agents (desktops and
+`garga-*-dev` only). The API key is never in this repo: macOS reads it
+from the Keychain (item `redmine-api-key`); other hosts read
+`~/.config/redmine/api-key`, which must be mode 600 (see the script
+header for the commands to create either).
+
 **SSH agent forwarding**: enabled — remote hosts use the mac's agent to
 clone from gitlab.netgate.com, so every ssh-profile host gets
 `ForwardAgent yes` via `~/.ssh/agent_forward` (private keys live only on
