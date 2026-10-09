@@ -1,0 +1,17 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/sh
+# Always search the same DNS suffixes, whatever network or VPN is up, so short
+# names (garga-noble-dev) resolve. The VPN only hands these to its own scoped
+# resolver; short names go through the primary service's search list, so set
+# the list on every network service. A new network service is only picked up
+# when this script changes or `chezmoi state delete-bucket --bucket=scriptState`
+# is run.
+# domains: home.arpa netgate.com atx.netgate.com eng.atx.netgate.com
+set -e
+
+networksetup -listallnetworkservices | tail -n +2 | sed 's/^\*//' |
+while IFS= read -r svc; do
+    sudo networksetup -setsearchdomains "$svc" \
+        home.arpa netgate.com atx.netgate.com eng.atx.netgate.com
+done
+{{- end -}}
