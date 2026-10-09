@@ -1,1 +1,6 @@
+# Trust unknown hosts on first connect, but refuse if a known key changes.
+# macOS does not use this file (see .chezmoiignore): set the same line in
+# the hand-managed ~/.ssh/config there.
+StrictHostKeyChecking accept-new
+
 Include ~/.ssh/agent_forward
