@@ -8,8 +8,11 @@
 # Edit the map in .chezmoi.toml.tmpl, not this file, and run `chezmoi init` after edits.
 {{- if $forward }}
 # ssh-profile hosts get the mac's agent; desktops (m2, e14) hold the private keys.
+# Each host is also matched as "<host>.*" so the FQDN (host.eng.atx.netgate.com)
+# forwards the agent too: ssh matches Host against the name typed, not the
+# canonical one.
 {{- if hasKey . "hosts" }}
-Host{{ range $host, $profile := .hosts }}{{ if ne $profile "desktop" }} {{ $host }}{{ end }}{{ end }}
+Host{{ range $host, $profile := .hosts }}{{ if ne $profile "desktop" }} {{ $host }} {{ $host }}.*{{ end }}{{ end }}
   ForwardAgent yes
 {{- end }}
 {{- if hasKey . "forward_extra" }}
