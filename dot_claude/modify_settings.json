@@ -9,4 +9,8 @@
 {{- if or (not (hasKey $settings "theme")) (eq (get $settings "theme") "auto") -}}
 {{-   $_ := set $settings "theme" "custom:gruvbox" -}}
 {{- end -}}
+{{- /* Same for the status line: only a default, a later edit is kept. */ -}}
+{{- if not (hasKey $settings "statusLine") -}}
+{{-   $_ := set $settings "statusLine" (dict "type" "command" "command" "~/.claude/statusline.sh") -}}
+{{- end -}}
 {{ toPrettyJson $settings | trim }}
