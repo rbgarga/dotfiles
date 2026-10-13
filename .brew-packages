@@ -13,3 +13,4 @@ shellcheck
 shfmt
 golangci-lint
 hadolint
+jq

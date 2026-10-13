@@ -27,3 +27,4 @@ terraform-ls
 tflint
 tree-sitter-cli
 unzip
+jq
