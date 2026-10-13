@@ -23,8 +23,13 @@ log=$HOME/.cache/chezmoi-update.log
 if [ -f "$log" ] && [ "$(wc -c < "$log")" -gt 102400 ]; then
     tail -n 200 "$log" > "$log.tmp" && mv "$log.tmp" "$log"
 fi
+# Nobody is there to answer: a locally modified file makes chezmoi ask
+# whether to overwrite it, on the tty by default, and the background job
+# would wait forever. --no-tty moves the prompt to stdin, where /dev/null
+# answers EOF: that file is left alone (and logged), --keep-going applies
+# the rest. Settle it by hand with chezmoi diff / apply / re-add.
 {
     echo "=== $(date)"
-    chezmoi update
+    chezmoi update --no-tty --keep-going
     echo "=== exit=$?"
-} >> "$log" 2>&1
+} >> "$log" 2>&1 < /dev/null
