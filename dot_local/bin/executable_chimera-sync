@@ -18,8 +18,8 @@ Commands:
   show HASH        show the patch that pick would apply
   pick HASH...     apply commits (only the relevant paths, remapped)
   pick --pending   apply pending commits in order, stop on first failure
-  continue         commit a pick after resolving conflicts
-  abort            drop a pick in progress
+  continue         commit a pick after resolving conflicts and go on
+  abort            drop a pick in progress and the rest of the queue
   skip HASH...     record commits that should not be picked
 """
 
@@ -27,6 +27,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -200,12 +201,7 @@ def load_skips(path):
 
 
 def applied_set(base, head, candidates):
-    applied = {}
-    body = gitout("log", "--format=%B", f"{base}..{head}")
-    for m in PICKED_RE.finditer(body):
-        r = git("rev-parse", "--verify", "-q", m.group(1) + "^{commit}", check=False)
-        if r.returncode == 0:
-            applied[r.stdout.strip()] = "trailer"
+    applied = dict.fromkeys(trailer_shas(base, head), "trailer")
 
     keys = set(
         gitout(
@@ -366,83 +362,199 @@ def state_path():
     return os.path.join(gitdir(), "chimera-sync.json")
 
 
-def commit_pick(state):
-    if not gitout("diff", "--cached", "--name-only").strip():
+def load_state():
+    if not os.path.exists(state_path()):
+        return None
+    with open(state_path()) as f:
+        return json.load(f)
+
+
+def save_state(st):
+    with open(state_path(), "w") as f:
+        json.dump(st, f)
+
+
+def clear_state():
+    if os.path.exists(state_path()):
         os.unlink(state_path())
-        sys.exit(
-            f"nothing to commit, {state['sha'][:9]} is already in;"
-            " consider 'chimera-sync skip' for it"
-        )
+
+
+def picking():
+    return os.path.exists(os.path.join(gitdir(), "CHERRY_PICK_HEAD"))
+
+
+def nothing_staged():
+    return not gitout("diff", "--cached", "--name-only").strip()
+
+
+def trailer_shas(base, head="HEAD"):
+    shas = set()
+    body = gitout("log", "--format=%B", f"{base}..{head}")
+    for m in PICKED_RE.finditer(body):
+        r = git("rev-parse", "--verify", "-q", m.group(1) + "^{commit}", check=False)
+        if r.returncode == 0:
+            shas.add(r.stdout.strip())
+    return shas
+
+
+def commit_meta(meta):
+    if nothing_staged():
+        return False
     env = dict(os.environ)
-    env["GIT_AUTHOR_NAME"] = state["name"]
-    env["GIT_AUTHOR_EMAIL"] = state["email"]
-    env["GIT_AUTHOR_DATE"] = state["date"]
+    env["GIT_AUTHOR_NAME"] = meta["name"]
+    env["GIT_AUTHOR_EMAIL"] = meta["email"]
+    env["GIT_AUTHOR_DATE"] = meta["date"]
     res = subprocess.run(
         ["git", "commit", "-q", "--no-verify", "-F", "-"],
-        input=state["msg"],
+        input=meta["msg"],
         text=True,
         env=env,
         check=False,
     )
     if res.returncode != 0:
         sys.exit("commit failed")
-    if os.path.exists(state_path()):
-        os.unlink(state_path())
+    return True
 
 
 def require_clean():
+    if load_state():
+        sys.exit("a pick is in progress, run 'continue' or 'abort'")
+    if picking():
+        sys.exit("a cherry-pick is in progress, finish it first")
     if gitout("status", "--porcelain", "--untracked-files=no").strip():
         sys.exit("working tree has uncommitted changes")
-    if os.path.exists(state_path()):
-        sys.exit("a pick is in progress, resolve it and run 'continue'")
 
 
-def pick_one(repo, c, dry, force=False):
-    tags = ",".join(sorted(c.tags))
-    print(f"==> {c.short} {c.subject}" + (f"  [{tags}]" if tags else ""))
-    if not c.keep:
-        print("    nothing relevant, skipping")
-        return True
+def apply_commit(repo, c, force):
+    """Returns (result, state) where result is applied, empty, refused or
+    conflict; state is what 'continue' needs after a conflict."""
     if "category-move" in c.tags and not force:
-        print(
-            "    upstream moved a package we carry between categories;"
-            " apply it by hand or skip it (pick --force to try anyway)"
-        )
-        return False
-    if dry:
-        return True
+        return "refused", None
     if not c.rename and not c.dropped:
         r = subprocess.run(["git", "cherry-pick", "-x", c.sha], check=False)
-        if r.returncode != 0:
-            print(
-                "\nresolve the conflicts, then 'git cherry-pick --continue'"
-                " (or --abort) and rerun"
-            )
-            return False
-        return True
+        if r.returncode == 0:
+            return "applied", None
+        if not picking():
+            sys.exit(f"cherry-pick of {c.short} failed")
+        return "conflict", {"mode": "cherry-pick"}
     info = gitout("log", "-1", "--format=%an%x00%ae%x00%ad", "--date=raw", c.sha)
     name, email, date = info.rstrip("\n").split("\0")
-    state = {
-        "sha": c.sha,
-        "name": name,
-        "email": email,
-        "date": date,
-        "msg": message(c),
-    }
+    meta = {"name": name, "email": email, "date": date, "msg": message(c)}
     res = git(
         "apply", "-3", "--index", "-", input=repo.patch(c), check=False, binary=True
     )
     if res.returncode != 0:
-        with open(state_path(), "w") as f:
-            json.dump(state, f)
         sys.stderr.write(res.stderr.decode())
-        print(
-            "\nresolve the conflicts, 'git add' the files and run"
-            " 'chimera-sync continue'"
-        )
-        return False
-    commit_pick(state)
-    return True
+        return "conflict", {"mode": "apply", "meta": meta}
+    return ("applied" if commit_meta(meta) else "empty"), None
+
+
+REPORT = (
+    ("applied", "applied"),
+    ("already", "already in"),
+    ("irrelevant", "nothing to pick"),
+    ("empty", "empty, consider skip"),
+    ("refused", "category move, not picked"),
+    ("dropped", "not applied"),
+)
+
+
+def subject(sha):
+    return gitout("log", "-1", "--format=%s", sha).strip()
+
+
+def print_report(report, current=None, queue=(), stop="stopped at"):
+    rows = [(label, sha) for key, label in REPORT for sha in report.get(key, [])]
+    if current:
+        rows.append((stop, current))
+    rows += [("not picked yet", sha) for sha in queue]
+    if not rows:
+        return
+    width = max(len(label) for label, _ in rows)
+    print()
+    for label, sha in rows:
+        print(f"{label + ':':<{width + 1}} {sha[:9]} {subject(sha)}")
+
+
+def run_queue(repo, queue, report, force=False, dry=False):
+    done = trailer_shas(repo.base)
+    while queue:
+        sha = queue.pop(0)
+        c = get_commit(repo, sha)
+        tags = ",".join(sorted(c.tags))
+        print(f"==> {c.short} {c.subject}" + (f"  [{tags}]" if tags else ""))
+        if dry:
+            continue
+        if sha in done:
+            report.setdefault("already", []).append(sha)
+            continue
+        if not c.keep:
+            report.setdefault("irrelevant", []).append(sha)
+            continue
+        res, st = apply_commit(repo, c, force)
+        if res == "conflict":
+            st.update(current=sha, queue=queue, report=report, force=force)
+            save_state(st)
+            print_report(report, sha, queue)
+            if st["mode"] == "cherry-pick":
+                how = "'git add' them (or 'git cherry-pick --continue')"
+            else:
+                how = "'git add' them"
+            print(
+                f"\nresolve the conflicts, {how} and run 'chimera-sync continue'"
+                " to commit and go on with the rest, or 'chimera-sync abort'"
+            )
+            sys.exit(1)
+        report.setdefault(res, []).append(sha)
+        if res == "applied":
+            done.add(sha)
+    if not dry:
+        print_report(report)
+    clear_state()
+
+
+def cmd_continue(repo, a):
+    st = load_state()
+    if not st:
+        sys.exit("no pick in progress")
+    if gitout("diff", "--name-only", "--diff-filter=U").strip():
+        sys.exit("there are still unmerged files")
+    sha = st["current"]
+    if st["mode"] == "cherry-pick":
+        if picking():
+            if nothing_staged():
+                git("cherry-pick", "--skip")
+                res = "empty"
+            else:
+                r = subprocess.run(
+                    ["git", "cherry-pick", "--continue"],
+                    env=dict(os.environ, GIT_EDITOR="true"),
+                    check=False,
+                )
+                if r.returncode != 0:
+                    sys.exit("git cherry-pick --continue failed")
+                res = "applied"
+        elif sha in trailer_shas(repo.base):
+            res = "applied"
+        else:
+            # finished by hand with git cherry-pick --skip or --abort
+            res = "dropped"
+    else:
+        res = "applied" if commit_meta(st["meta"]) else "empty"
+    st["report"].setdefault(res, []).append(sha)
+    run_queue(repo, st["queue"], st["report"], st["force"])
+
+
+def cmd_abort(repo, a):
+    st = load_state()
+    if not st:
+        sys.exit("no pick in progress")
+    if picking():
+        git("cherry-pick", "--abort")
+    elif st["mode"] == "apply":
+        git("reset", "-q", "--merge")
+    clear_state()
+    print_report(st["report"], st["current"], st["queue"], "aborted")
 
 
 def cmd_pending(repo, a):
@@ -480,32 +592,18 @@ def cmd_show(repo, a):
 
 
 def cmd_pick(repo, a):
-    require_clean()
     if a.pending:
         todo, _, _ = repo.pending()
         if a.limit:
             todo = todo[: a.limit]
+        shas = [c.sha for c in todo]
     else:
-        todo = [get_commit(repo, h) for h in a.commits]
-    for c in todo:
-        if not pick_one(repo, c, a.dry_run, a.force):
-            sys.exit(1)
-
-
-def cmd_continue(repo, a):
-    if not os.path.exists(state_path()):
-        sys.exit("no pick in progress")
-    if gitout("diff", "--name-only", "--diff-filter=U").strip():
-        sys.exit("there are still unmerged files")
-    with open(state_path()) as f:
-        commit_pick(json.load(f))
-
-
-def cmd_abort(repo, a):
-    if not os.path.exists(state_path()):
-        sys.exit("no pick in progress")
-    git("reset", "-q", "--merge")
-    os.unlink(state_path())
+        shas = [
+            gitout("rev-parse", "--verify", h + "^{commit}").strip() for h in a.commits
+        ]
+    if not a.dry_run:
+        require_clean()
+    run_queue(repo, shas, {}, a.force, a.dry_run)
 
 
 def cmd_skip(repo, a):
@@ -516,6 +614,32 @@ def cmd_skip(repo, a):
             reason = f" {a.message}" if a.message else ""
             f.write(f"{c.sha} #{reason} ({c.subject})\n")
             print(f"skipped {c.short} {c.subject}")
+    chezmoi_readd(repo.skipfile)
+
+
+def chezmoi_readd(path):
+    """Copy the skip file back to the chezmoi source if chezmoi manages it."""
+    if not shutil.which("chezmoi"):
+        return
+    path = os.path.abspath(path)
+    r = subprocess.run(
+        ["chezmoi", "source-path", path], capture_output=True, text=True, check=False
+    )
+    if r.returncode != 0:
+        return
+    src = r.stdout.strip()
+    if subprocess.run(["chezmoi", "re-add", path], check=False).returncode != 0:
+        print(f"warning: chezmoi re-add {path} failed", file=sys.stderr)
+        return
+    srcdir = subprocess.run(
+        ["chezmoi", "source-path"], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    rel = os.path.relpath(src, srcdir)
+    print(
+        f"\nupdated {src}, commit it with:\n"
+        f"  chezmoi git -- commit -m 'Update chimera-sync skips' -- {rel}\n"
+        "  chezmoi git push"
+    )
 
 
 def default_skip_file():
@@ -546,7 +670,7 @@ def main():
     sp.add_argument("-n", "--limit", type=int)
     sp.add_argument("--dry-run", action="store_true")
     sp.add_argument("--force", action="store_true")
-    sp = sub.add_parser("continue", help="commit a resolved pick")
+    sp = sub.add_parser("continue", help="commit a resolved pick, go on")
     sp.set_defaults(func=cmd_continue)
     sp = sub.add_parser("abort", help="drop a pick in progress")
     sp.set_defaults(func=cmd_abort)
