@@ -5,7 +5,7 @@
 - Do not add the Co-Authored-By: line on commit messages
 - Git commit messages must always be in English and respect maximum
   of 72 columns
-- Never push to `main` or `master`. Always work on a feature branch.
+- Never push to `main`, `master` or `stable`. Always work on a feature branch.
   Checkout feature branch on a worktree at scratchpad and do not change
   current directory branch.
 - Never push commits before the user has reviewed the local diff and
