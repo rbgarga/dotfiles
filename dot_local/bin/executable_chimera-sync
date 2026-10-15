@@ -1,0 +1,564 @@
+#!/usr/bin/env python3
+"""
+chimera-sync: track and cherry-pick upstream Chimera cports commits into a
+cports fork that carries only a subset of the packages.
+
+A commit is relevant when it touches a package we carry (in any category,
+so upstream user/foo maps to our main/foo) or anything outside the package
+categories (cbuild, etc, ci, docs). A commit counts as applied when one of
+our commits carries its "(cherry picked from commit X)" line, has the same
+author, author date and subject (what cherry-pick preserves), or has the
+same patch-id, or when its content is already there: every package it
+touches is identical to upstream's current version, or its patch applies
+in reverse. Commits can also be marked as skipped in a skip file
+($CHIMERA_SYNC_SKIP, default ~/.config/chimera-sync/skip).
+
+Commands:
+  pending          list relevant commits that were not applied (default)
+  show HASH        show the patch that pick would apply
+  pick HASH...     apply commits (only the relevant paths, remapped)
+  pick --pending   apply pending commits in order, stop on first failure
+  continue         commit a pick after resolving conflicts
+  abort            drop a pick in progress
+  skip HASH...     record commits that should not be picked
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+CATEGORIES = ("main", "user", "contrib")
+PICKED_RE = re.compile(r"cherry picked from commit ([0-9a-f]{7,40})")
+
+
+def git(*args, check=True, input=None, binary=False):
+    res = subprocess.run(
+        ["git", "-c", "core.quotePath=false", *args],
+        capture_output=True,
+        input=input,
+        text=not binary,
+        check=False,
+    )
+    if check and res.returncode != 0:
+        err = res.stderr if not binary else res.stderr.decode()
+        sys.exit(f"git {' '.join(args)} failed:\n{err.strip()}")
+    return res
+
+
+def gitout(*args):
+    return git(*args).stdout
+
+
+class Commit:
+    def __init__(self, sha, email, date, subject):
+        self.sha = sha
+        self.email = email
+        self.date = date
+        self.subject = subject
+        # (oldmode, newmode, newsha, status, path)
+        self.changes = []
+        self.keep = []  # original paths to apply
+        self.rename = {}  # original package path prefix -> ours
+        self.dropped = set()  # packages we do not carry
+        self.tags = set()
+
+    @property
+    def short(self):
+        return self.sha[:9]
+
+
+def parse_log(rng):
+    out = gitout(
+        "log",
+        "--no-merges",
+        "--reverse",
+        "--topo-order",
+        "--raw",
+        "--no-renames",
+        "--no-abbrev",
+        "--format=commit %H%x09%ae%x09%at%x09%s",
+        rng,
+    )
+    commits = []
+    cur = None
+    for ln in out.splitlines():
+        if ln.startswith("commit "):
+            sha, email, date, subj = ln[7:].split("\t", 3)
+            cur = Commit(sha, email, date, subj)
+            commits.append(cur)
+        elif ln.startswith(":") and cur:
+            meta, path = ln.split("\t", 1)
+            omode, nmode, _, nsha, status = meta[1:].split()
+            cur.changes.append((omode, nmode, nsha, status, path))
+    return commits
+
+
+def our_packages(head):
+    pkgs = {}
+    out = gitout("ls-tree", head, *(f"{c}/" for c in CATEGORIES))
+    for ln in out.splitlines():
+        path = ln.split("\t", 1)[1]
+        cat, name = path.split("/", 1)
+        pkgs[name] = cat
+    return pkgs
+
+
+def symlink_targets(shas):
+    if not shas:
+        return {}
+    res = git("cat-file", "--batch", input="\n".join(shas) + "\n", binary=False).stdout
+    targets = {}
+    lines = iter(res.split("\n"))
+    for hdr in lines:
+        if not hdr:
+            continue
+        sha, _, size = hdr.split()
+        targets[sha] = next(lines)[: int(size)]
+    return targets
+
+
+def classify(commits, pkgs):
+    # new top-level symlinks (subpackages) need their target resolved
+    links = set()
+    for c in commits:
+        for omode, nmode, nsha, status, path in c.changes:
+            parts = path.split("/")
+            if (
+                len(parts) == 2
+                and parts[0] in CATEGORIES
+                and nmode == "120000"
+                and parts[1] not in pkgs
+            ):
+                links.add(nsha)
+    targets = symlink_targets(sorted(links))
+
+    for c in commits:
+        for omode, nmode, nsha, status, path in c.changes:
+            parts = path.split("/")
+            if parts[0] not in CATEGORIES or len(parts) < 2:
+                c.keep.append(path)
+                c.tags.add("cbuild" if parts[0] == "src" else "infra")
+                continue
+            cat, name = parts[0], parts[1]
+            ours = pkgs.get(name)
+            if not ours and nmode == "120000" and len(parts) == 2:
+                tgt = targets.get(nsha, "")
+                if tgt in pkgs:
+                    ours = pkgs[tgt]
+            if not ours:
+                c.dropped.add(f"{cat}/{name}")
+                continue
+            c.keep.append(path)
+            if ours != cat:
+                c.rename[f"{cat}/{name}"] = f"{ours}/{name}"
+                c.tags.add(f"{cat}->{ours}")
+        if c.keep and c.dropped:
+            c.tags.add("partial")
+            if "cbuild" in c.tags and not c.subject.startswith("cbuild"):
+                # cbuild changes hidden in a package commit
+                c.tags.add("CBUILD-IN-PKG")
+        # upstream moved one of our packages between categories; after
+        # remapping, the removal and the addition hit the same paths
+        if any(
+            p.startswith(v + "/") or p == v for v in c.rename.values() for p in c.keep
+        ):
+            c.tags.add("category-move")
+
+
+def gitdir():
+    return gitout("rev-parse", "--git-dir").strip()
+
+
+def tree_map(ref):
+    out = gitout("ls-tree", ref, *(f"{c}/" for c in CATEGORIES))
+    res = {}
+    for ln in out.splitlines():
+        meta, path = ln.split("\t", 1)
+        res[path] = meta.split()[2]
+    return res
+
+
+def load_skips(path):
+    skips = {}
+    if not os.path.exists(path):
+        return skips
+    with open(path) as f:
+        for ln in f:
+            ln = ln.strip()
+            if not ln or ln.startswith("#"):
+                continue
+            h = ln.split()[0]
+            r = git("rev-parse", "--verify", "-q", h + "^{commit}", check=False)
+            if r.returncode != 0:
+                print(f"warning: unknown commit {h} in {path}", file=sys.stderr)
+                continue
+            skips[r.stdout.strip()] = ln
+    return skips
+
+
+def applied_set(base, head, candidates):
+    applied = {}
+    body = gitout("log", "--format=%B", f"{base}..{head}")
+    for m in PICKED_RE.finditer(body):
+        r = git("rev-parse", "--verify", "-q", m.group(1) + "^{commit}", check=False)
+        if r.returncode == 0:
+            applied[r.stdout.strip()] = "trailer"
+
+    keys = set(
+        gitout(
+            "log", "--no-merges", "--format=%ae%x09%at%x09%s", f"{base}..{head}"
+        ).splitlines()
+    )
+    for c in candidates:
+        if c.sha not in applied and f"{c.email}\t{c.date}\t{c.subject}" in keys:
+            applied[c.sha] = "author+date"
+
+    left = [c for c in candidates if c.sha not in applied]
+    if left:
+        ours = patch_ids(["log", "-p", "--no-merges", f"{base}..{head}"])
+        theirs = patch_ids(["show", "-p", "--format=commit %H", *(c.sha for c in left)])
+        known = set(ours)
+        for pid, sha in theirs.items():
+            if pid in known:
+                applied[sha] = "patch-id"
+    return applied
+
+
+def patch_ids(cmd):
+    diff = git(*cmd, binary=True).stdout
+    out = subprocess.run(
+        ["git", "patch-id", "--stable"],
+        input=diff,
+        capture_output=True,
+        check=False,
+    ).stdout.decode()
+    return dict(ln.split() for ln in out.splitlines())
+
+
+class Repo:
+    def __init__(self, args):
+        os.chdir(gitout("rev-parse", "--show-toplevel").strip())
+        self.args = args
+        self.head = "HEAD"
+        self.upstream = args.upstream
+        self.base = args.base or gitout("merge-base", self.head, self.upstream).strip()
+        self.skipfile = args.skip_file
+        self.pkgs = our_packages(self.head)
+
+    def pending(self, with_applied=False):
+        commits = parse_log(f"{self.base}..{self.upstream}")
+        classify(commits, self.pkgs)
+        relevant = [c for c in commits if c.keep]
+        applied = applied_set(self.base, self.head, relevant)
+        skips = load_skips(self.skipfile)
+        stats = {
+            "upstream": len(commits),
+            "irrelevant": len(commits) - len(relevant),
+            "applied": sum(1 for c in relevant if c.sha in applied),
+            "skipped": sum(
+                1 for c in relevant if c.sha in skips and c.sha not in applied
+            ),
+        }
+        pend = [c for c in relevant if c.sha not in applied and c.sha not in skips]
+        for c in pend:
+            how = self.content_applied(c)
+            if how:
+                applied[c.sha] = how
+        stats["applied"] += sum(1 for c in pend if c.sha in applied)
+        pend = [c for c in pend if c.sha not in applied]
+        stats["pending"] = len(pend)
+        return pend, stats, applied
+
+    def trees(self):
+        if not hasattr(self, "_ours"):
+            self._ours = tree_map(self.head)
+            self._theirs = tree_map(self.upstream)
+        return self._ours, self._theirs
+
+    def content_applied(self, c):
+        ours, theirs = self.trees()
+        pkgs = set()
+        for p in c.keep:
+            parts = p.split("/")
+            if parts[0] not in CATEGORIES:
+                pkgs = None
+                break
+            pkgs.add((parts[0], parts[1]))
+        if pkgs:
+            synced = True
+            for cat, name in pkgs:
+                mine = ours.get(f"{self.pkgs.get(name, cat)}/{name}")
+                if not mine or mine != theirs.get(f"{cat}/{name}"):
+                    synced = False
+                    break
+            if synced:
+                return "in-sync"
+        if self.reverse_applies(c):
+            return "content"
+        return None
+
+    def reverse_applies(self, c):
+        idx = os.path.join(gitdir(), "chimera-sync.index")
+        env = dict(os.environ, GIT_INDEX_FILE=idx)
+        try:
+            subprocess.run(["git", "read-tree", self.head], env=env, check=True)
+            res = subprocess.run(
+                ["git", "apply", "--check", "--cached", "-R", "-"],
+                input=self.patch(c),
+                env=env,
+                capture_output=True,
+                check=False,
+            )
+            return res.returncode == 0
+        finally:
+            if os.path.exists(idx):
+                os.unlink(idx)
+
+    def patch(self, c):
+        diff = git(
+            "diff-tree",
+            "-p",
+            "--binary",
+            "--full-index",
+            "--no-renames",
+            f"{c.sha}^",
+            c.sha,
+            "--",
+            *c.keep,
+            binary=True,
+        ).stdout
+        if not c.rename:
+            return diff
+        lines = diff.split(b"\n")
+        for i, ln in enumerate(lines):
+            if not ln.startswith((b"diff --git ", b"--- ", b"+++ ")):
+                continue
+            for src, dst in c.rename.items():
+                for pfx in (b"a/", b"b/"):
+                    s, d = pfx + src.encode(), pfx + dst.encode()
+                    ln = re.sub(re.escape(s) + rb"(?=/|$|\s)", d, ln)
+            lines[i] = ln
+        return b"\n".join(lines)
+
+
+def get_commit(repo, h):
+    sha = gitout("rev-parse", "--verify", h + "^{commit}").strip()
+    c = parse_log(f"{sha}^!")[0]
+    classify([c], repo.pkgs)
+    return c
+
+
+def message(c):
+    msg = gitout("log", "-1", "--format=%B", c.sha).rstrip() + "\n\n"
+    msg += f"(cherry picked from commit {c.sha})\n"
+    if c.rename:
+        moves = ", ".join(f"{s} -> {d}" for s, d in sorted(c.rename.items()))
+        msg += f"(chimera-sync: {moves})\n"
+    if c.dropped:
+        msg += "(chimera-sync: dropped " + ", ".join(sorted(c.dropped)) + ")\n"
+    return msg
+
+
+def state_path():
+    return os.path.join(gitdir(), "chimera-sync.json")
+
+
+def commit_pick(state):
+    if not gitout("diff", "--cached", "--name-only").strip():
+        os.unlink(state_path())
+        sys.exit(
+            f"nothing to commit, {state['sha'][:9]} is already in;"
+            " consider 'chimera-sync skip' for it"
+        )
+    env = dict(os.environ)
+    env["GIT_AUTHOR_NAME"] = state["name"]
+    env["GIT_AUTHOR_EMAIL"] = state["email"]
+    env["GIT_AUTHOR_DATE"] = state["date"]
+    res = subprocess.run(
+        ["git", "commit", "-q", "--no-verify", "-F", "-"],
+        input=state["msg"],
+        text=True,
+        env=env,
+        check=False,
+    )
+    if res.returncode != 0:
+        sys.exit("commit failed")
+    if os.path.exists(state_path()):
+        os.unlink(state_path())
+
+
+def require_clean():
+    if gitout("status", "--porcelain", "--untracked-files=no").strip():
+        sys.exit("working tree has uncommitted changes")
+    if os.path.exists(state_path()):
+        sys.exit("a pick is in progress, resolve it and run 'continue'")
+
+
+def pick_one(repo, c, dry, force=False):
+    tags = ",".join(sorted(c.tags))
+    print(f"==> {c.short} {c.subject}" + (f"  [{tags}]" if tags else ""))
+    if not c.keep:
+        print("    nothing relevant, skipping")
+        return True
+    if "category-move" in c.tags and not force:
+        print(
+            "    upstream moved a package we carry between categories;"
+            " apply it by hand or skip it (pick --force to try anyway)"
+        )
+        return False
+    if dry:
+        return True
+    if not c.rename and not c.dropped:
+        r = subprocess.run(["git", "cherry-pick", "-x", c.sha], check=False)
+        if r.returncode != 0:
+            print(
+                "\nresolve the conflicts, then 'git cherry-pick --continue'"
+                " (or --abort) and rerun"
+            )
+            return False
+        return True
+    info = gitout("log", "-1", "--format=%an%x00%ae%x00%ad", "--date=raw", c.sha)
+    name, email, date = info.rstrip("\n").split("\0")
+    state = {
+        "sha": c.sha,
+        "name": name,
+        "email": email,
+        "date": date,
+        "msg": message(c),
+    }
+    res = git(
+        "apply", "-3", "--index", "-", input=repo.patch(c), check=False, binary=True
+    )
+    if res.returncode != 0:
+        with open(state_path(), "w") as f:
+            json.dump(state, f)
+        sys.stderr.write(res.stderr.decode())
+        print(
+            "\nresolve the conflicts, 'git add' the files and run"
+            " 'chimera-sync continue'"
+        )
+        return False
+    commit_pick(state)
+    return True
+
+
+def cmd_pending(repo, a):
+    pend, stats, applied = repo.pending()
+    for c in pend:
+        tags = ",".join(sorted(c.tags))
+        date = gitout("log", "-1", "--format=%as", c.sha).strip() if a.dates else ""
+        print(
+            f"{c.short} {date + ' ' if date else ''}{c.subject}"
+            + (f"  [{tags}]" if tags else "")
+        )
+        if a.files:
+            for p in c.keep:
+                print(f"        {p}")
+            for p in sorted(c.dropped):
+                print(f"      - {p}")
+    how = {}
+    for v in applied.values():
+        how[v] = how.get(v, 0) + 1
+    print(
+        f"\n{stats['upstream']} upstream commits since {repo.base[:9]}: "
+        f"{stats['irrelevant']} irrelevant, {stats['applied']} applied "
+        f"({', '.join(f'{k} {v}' for k, v in sorted(how.items()))}), "
+        f"{stats['skipped']} skipped, {stats['pending']} pending",
+        file=sys.stderr,
+    )
+
+
+def cmd_show(repo, a):
+    c = get_commit(repo, a.commit)
+    sys.stdout.write(message(c))
+    print(f"tags: {', '.join(sorted(c.tags)) or '-'}\n")
+    sys.stdout.flush()
+    sys.stdout.buffer.write(repo.patch(c))
+
+
+def cmd_pick(repo, a):
+    require_clean()
+    if a.pending:
+        todo, _, _ = repo.pending()
+        if a.limit:
+            todo = todo[: a.limit]
+    else:
+        todo = [get_commit(repo, h) for h in a.commits]
+    for c in todo:
+        if not pick_one(repo, c, a.dry_run, a.force):
+            sys.exit(1)
+
+
+def cmd_continue(repo, a):
+    if not os.path.exists(state_path()):
+        sys.exit("no pick in progress")
+    if gitout("diff", "--name-only", "--diff-filter=U").strip():
+        sys.exit("there are still unmerged files")
+    with open(state_path()) as f:
+        commit_pick(json.load(f))
+
+
+def cmd_abort(repo, a):
+    if not os.path.exists(state_path()):
+        sys.exit("no pick in progress")
+    git("reset", "-q", "--merge")
+    os.unlink(state_path())
+
+
+def cmd_skip(repo, a):
+    os.makedirs(os.path.dirname(os.path.abspath(repo.skipfile)), exist_ok=True)
+    with open(repo.skipfile, "a") as f:
+        for h in a.commits:
+            c = get_commit(repo, h)
+            reason = f" {a.message}" if a.message else ""
+            f.write(f"{c.sha} #{reason} ({c.subject})\n")
+            print(f"skipped {c.short} {c.subject}")
+
+
+def default_skip_file():
+    if os.environ.get("CHIMERA_SYNC_SKIP"):
+        return os.environ["CHIMERA_SYNC_SKIP"]
+    cfg = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(cfg, "chimera-sync", "skip")
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    p.add_argument("--upstream", default="upstream/master")
+    p.add_argument("--base", help="start of the range (default: merge-base)")
+    p.add_argument("--skip-file", default=default_skip_file())
+    p.set_defaults(func=cmd_pending, files=False, dates=False)
+    sub = p.add_subparsers()
+    sp = sub.add_parser("pending", help="list commits not applied yet")
+    sp.set_defaults(func=cmd_pending)
+    sp.add_argument("--files", action="store_true", help="list paths")
+    sp.add_argument("--dates", action="store_true", help="show commit dates")
+    sp = sub.add_parser("show", help="show what pick would apply")
+    sp.set_defaults(func=cmd_show)
+    sp.add_argument("commit")
+    sp = sub.add_parser("pick", help="apply commits")
+    sp.set_defaults(func=cmd_pick)
+    sp.add_argument("commits", nargs="*")
+    sp.add_argument("--pending", action="store_true")
+    sp.add_argument("-n", "--limit", type=int)
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--force", action="store_true")
+    sp = sub.add_parser("continue", help="commit a resolved pick")
+    sp.set_defaults(func=cmd_continue)
+    sp = sub.add_parser("abort", help="drop a pick in progress")
+    sp.set_defaults(func=cmd_abort)
+    sp = sub.add_parser("skip", help="mark commits as not wanted")
+    sp.set_defaults(func=cmd_skip)
+    sp.add_argument("commits", nargs="+")
+    sp.add_argument("-m", "--message")
+    a = p.parse_args()
+    if a.func is cmd_pick and not (a.commits or a.pending):
+        p.error("pick needs commits or --pending")
+    a.func(Repo(a), a)
+
+
+if __name__ == "__main__":
+    main()
