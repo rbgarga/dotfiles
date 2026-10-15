@@ -8,9 +8,10 @@ so upstream user/foo maps to our main/foo) or anything outside the package
 categories (cbuild, etc, ci, docs). A commit counts as applied when one of
 our commits carries its "(cherry picked from commit X)" line, has the same
 author, author date and subject (what cherry-pick preserves), or has the
-same patch-id, or when its content is already there: every package it
-touches is identical to upstream's current version, or its patch applies
-in reverse. Commits can also be marked as skipped in a skip file
+same patch-id, or when its content is already there: every file it
+touches already matches upstream's current version (so it was applied, or
+upstream changed or reverted it later), or its patch applies in reverse.
+pick checks this too, and lints the packages it touched with cbuild. Commits can also be marked as skipped in a skip file
 ($CHIMERA_SYNC_SKIP, default ~/.config/chimera-sync/skip).
 
 Commands:
@@ -173,15 +174,6 @@ def gitdir():
     return gitout("rev-parse", "--git-dir").strip()
 
 
-def tree_map(ref):
-    out = gitout("ls-tree", ref, *(f"{c}/" for c in CATEGORIES))
-    res = {}
-    for ln in out.splitlines():
-        meta, path = ln.split("\t", 1)
-        res[path] = meta.split()[2]
-    return res
-
-
 def load_skips(path):
     skips = {}
     if not os.path.exists(path):
@@ -268,33 +260,24 @@ class Repo:
         stats["pending"] = len(pend)
         return pend, stats, applied
 
-    def trees(self):
-        if not hasattr(self, "_ours"):
-            self._ours = tree_map(self.head)
-            self._theirs = tree_map(self.upstream)
-        return self._ours, self._theirs
-
     def content_applied(self, c):
-        ours, theirs = self.trees()
-        pkgs = set()
-        for p in c.keep:
-            parts = p.split("/")
-            if parts[0] not in CATEGORIES:
-                pkgs = None
-                break
-            pkgs.add((parts[0], parts[1]))
-        if pkgs:
-            synced = True
-            for cat, name in pkgs:
-                mine = ours.get(f"{self.pkgs.get(name, cat)}/{name}")
-                if not mine or mine != theirs.get(f"{cat}/{name}"):
-                    synced = False
-                    break
-            if synced:
-                return "in-sync"
+        if self.in_sync(c):
+            return "in-sync"
         if self.reverse_applies(c):
             return "content"
         return None
+
+    def in_sync(self, c):
+        """Every file the commit touches (missing counts too) is the same
+        here and in upstream's current tree."""
+        specs = []
+        for p in c.keep:
+            specs += [f"{self.head}:{ours_path(c, p)}", f"{self.upstream}:{p}"]
+        out = git(
+            "cat-file", "--batch-check=%(objectname)", input="\n".join(specs) + "\n"
+        ).stdout.splitlines()
+        objs = [None if ln.endswith(" missing") else ln for ln in out]
+        return all(objs[i] == objs[i + 1] for i in range(0, len(objs), 2))
 
     def reverse_applies(self, c):
         idx = os.path.join(gitdir(), "chimera-sync.index")
@@ -338,6 +321,13 @@ class Repo:
                     ln = re.sub(re.escape(s) + rb"(?=/|$|\s)", d, ln)
             lines[i] = ln
         return b"\n".join(lines)
+
+
+def ours_path(c, path):
+    for src, dst in c.rename.items():
+        if path == src or path.startswith(src + "/"):
+            return dst + path[len(src) :]
+    return path
 
 
 def get_commit(repo, h):
@@ -452,6 +442,7 @@ def apply_commit(repo, c, force):
 REPORT = (
     ("applied", "applied"),
     ("already", "already in"),
+    ("insync", "files already match upstream"),
     ("irrelevant", "nothing to pick"),
     ("empty", "empty, consider skip"),
     ("refused", "category move, not picked"),
@@ -476,7 +467,7 @@ def print_report(report, current=None, queue=(), stop="stopped at"):
         print(f"{label + ':':<{width + 1}} {sha[:9]} {subject(sha)}")
 
 
-def run_queue(repo, queue, report, force=False, dry=False):
+def run_queue(repo, queue, report, force=False, dry=False, lint=True):
     done = trailer_shas(repo.base)
     while queue:
         sha = queue.pop(0)
@@ -491,9 +482,14 @@ def run_queue(repo, queue, report, force=False, dry=False):
         if not c.keep:
             report.setdefault("irrelevant", []).append(sha)
             continue
+        how = None if force else repo.content_applied(c)
+        if how:
+            key = "insync" if how == "in-sync" else "already"
+            report.setdefault(key, []).append(sha)
+            continue
         res, st = apply_commit(repo, c, force)
         if res == "conflict":
-            st.update(current=sha, queue=queue, report=report, force=force)
+            st.update(current=sha, queue=queue, report=report, force=force, lint=lint)
             save_state(st)
             print_report(report, sha, queue)
             if st["mode"] == "cherry-pick":
@@ -510,7 +506,37 @@ def run_queue(repo, queue, report, force=False, dry=False):
             done.add(sha)
     if not dry:
         print_report(report)
+        if lint:
+            lint_packages(repo, report.get("applied", []))
     clear_state()
+
+
+def lint_packages(repo, shas):
+    """Load the templates the picks touched, to catch picks that do not
+    fit the current cbuild (lint does not run build-time functions)."""
+    if not shas or not os.path.exists("cbuild"):
+        return
+    pkgs = set()
+    for sha in shas:
+        c = get_commit(repo, sha)
+        for p in c.keep:
+            parts = ours_path(c, p).split("/")
+            if parts[0] in CATEGORIES and len(parts) > 2:
+                pkgs.add("/".join(parts[:2]))
+    pkgs = sorted(p for p in pkgs if os.path.exists(f"{p}/template.py"))
+    bad = []
+    for pkg in pkgs:
+        r = subprocess.run(
+            ["./cbuild", "lint", pkg], capture_output=True, text=True, check=False
+        )
+        if r.returncode != 0:
+            bad.append(pkg)
+            print(f"\nlint failed for {pkg}:")
+            print("\n".join((r.stdout + r.stderr).strip().splitlines()[-4:]))
+    if bad:
+        print(f"\nlint: {len(bad)} of {len(pkgs)} packages failed: {' '.join(bad)}")
+    elif pkgs:
+        print(f"\nlint: {len(pkgs)} packages OK")
 
 
 def cmd_continue(repo, a):
@@ -542,7 +568,8 @@ def cmd_continue(repo, a):
     else:
         res = "applied" if commit_meta(st["meta"]) else "empty"
     st["report"].setdefault(res, []).append(sha)
-    run_queue(repo, st["queue"], st["report"], st["force"])
+    lint = st.get("lint", True) and not a.no_lint
+    run_queue(repo, st["queue"], st["report"], st["force"], lint=lint)
 
 
 def cmd_abort(repo, a):
@@ -603,7 +630,7 @@ def cmd_pick(repo, a):
         ]
     if not a.dry_run:
         require_clean()
-    run_queue(repo, shas, {}, a.force, a.dry_run)
+    run_queue(repo, shas, {}, a.force, a.dry_run, not a.no_lint)
 
 
 def cmd_skip(repo, a):
@@ -669,9 +696,13 @@ def main():
     sp.add_argument("--pending", action="store_true")
     sp.add_argument("-n", "--limit", type=int)
     sp.add_argument("--dry-run", action="store_true")
-    sp.add_argument("--force", action="store_true")
+    sp.add_argument(
+        "--force", action="store_true", help="pick even if it looks applied"
+    )
+    sp.add_argument("--no-lint", action="store_true", help="skip cbuild lint")
     sp = sub.add_parser("continue", help="commit a resolved pick, go on")
     sp.set_defaults(func=cmd_continue)
+    sp.add_argument("--no-lint", action="store_true", help="skip cbuild lint")
     sp = sub.add_parser("abort", help="drop a pick in progress")
     sp.set_defaults(func=cmd_abort)
     sp = sub.add_parser("skip", help="mark commits as not wanted")
