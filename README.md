@@ -13,6 +13,15 @@ sudo sh -c 'curl -sfL https://get.chezmoi.io | sh -s -- -b /usr/local/bin'
 curl -sfL https://get.chezmoi.io | sh -s -- -b "$HOME/.local/bin"
 ```
 
+On Chimera Linux, chezmoi is packaged in the `user` repository, which is
+not enabled by default:
+
+```sh
+doas apk add chimera-repo-user
+doas apk update
+doas apk add chezmoi git
+```
+
 1. Install chezmoi, then:
 
 ```sh
