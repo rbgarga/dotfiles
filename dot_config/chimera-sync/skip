@@ -11,3 +11,7 @@ dc1fa1e149d1b2ec0aa67b0b002ea8c5e221842c # category move only, content already h
 7a6c408dd71f5b8d6873cc1eb9b2feb6886eb384 # rebuild already done here (*/*: rebuild for boost)
 16f4a5bc8fe4284a1676858228a218ca88b8b521 # net zero with 0298445b6 (user/bmaptool: rebuild for gpgmepy)
 3841a1cc992e160ed46f5c7f3e00db791ad644bf # (user/net-snmp: new package)
+69e1e94b01f78a45aae00c201ad7ed1a40e1cbe0 # (main/fzf: update to 0.70.0)
+66cb1ac8255d2e2bae33cda86b8779f310279412 # (main/fzf: update to 0.71.0)
+cf6001dc0e35641ef8eb2f6a6bca76405e1adfb4 # (main/fzf: update to 0.72.0)
+7444572e88205ac15cdd48a3c6578d91e87a68fe # (user/fzf: move from main and update to 0.73.1)
