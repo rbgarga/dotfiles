@@ -11,8 +11,10 @@ author, author date and subject (what cherry-pick preserves), or has the
 same patch-id, or when its content is already there: every file it
 touches already matches upstream's current version (so it was applied, or
 upstream changed or reverted it later), or its patch applies in reverse.
-pick checks this too, and lints the packages it touched with cbuild. Commits can also be marked as skipped in a skip file
-($CHIMERA_SYNC_SKIP, default ~/.config/chimera-sync/skip).
+pick checks this too, and lints the packages it touched with cbuild.
+Commits can also be marked as skipped in a file tracked in the cports
+repository (.skipped-upstream-commits at its top level, or the path in
+$CHIMERA_SYNC_SKIP), so it is committed and shared like any other change.
 
 Commands:
   pending          list relevant commits that were not applied (default)
@@ -28,11 +30,11 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 
 CATEGORIES = ("main", "user", "contrib")
+SKIPFILE = ".skipped-upstream-commits"
 PICKED_RE = re.compile(r"cherry picked from commit ([0-9a-f]{7,40})")
 
 
@@ -233,7 +235,7 @@ class Repo:
         self.head = "HEAD"
         self.upstream = args.upstream
         self.base = args.base or gitout("merge-base", self.head, self.upstream).strip()
-        self.skipfile = args.skip_file
+        self.skipfile = args.skip_file or os.path.join(os.getcwd(), SKIPFILE)
         self.pkgs = our_packages(self.head)
 
     def pending(self, with_applied=False):
@@ -356,7 +358,12 @@ def load_state():
     if not os.path.exists(state_path()):
         return None
     with open(state_path()) as f:
-        return json.load(f)
+        st = json.load(f)
+    if "mode" not in st:
+        print("dropping pick state left by an older chimera-sync", file=sys.stderr)
+        clear_state()
+        return None
+    return st
 
 
 def save_state(st):
@@ -406,12 +413,37 @@ def commit_meta(meta):
     return True
 
 
-def require_clean():
-    if load_state():
-        sys.exit("a pick is in progress, run 'continue' or 'abort'")
+def dirty(repo):
+    """Uncommitted changes, ignoring the skip file: picks never touch it,
+    and 'skip' leaves it modified until the user commits it."""
+    args = ["status", "--porcelain", "--untracked-files=no"]
+    rel = os.path.relpath(repo.skipfile)
+    if not rel.startswith(".."):
+        args += ["--", ".", f":(exclude){rel}"]
+    return bool(gitout(*args).strip())
+
+
+def unmerged():
+    return bool(gitout("diff", "--name-only", "--diff-filter=U").strip())
+
+
+def require_clean(repo):
+    st = load_state()
+    if st:
+        if picking() or unmerged() or dirty(repo):
+            sys.exit("a pick is in progress, run 'continue' or 'abort'")
+        # resolved or dropped behind our back (git cherry-pick --abort,
+        # reset, manual commit): nothing is left to continue
+        left = st.get("queue", [])
+        print(
+            f"dropping stale pick state (stopped at {st['current'][:9]}, "
+            f"{len(left)} commits were still queued)",
+            file=sys.stderr,
+        )
+        clear_state()
     if picking():
         sys.exit("a cherry-pick is in progress, finish it first")
-    if gitout("status", "--porcelain", "--untracked-files=no").strip():
+    if dirty(repo):
         sys.exit("working tree has uncommitted changes")
 
 
@@ -508,7 +540,7 @@ def run_queue(repo, queue, report, force=False, dry=False, lint=True):
         print_report(report)
         if lint:
             lint_packages(repo, report.get("applied", []))
-    clear_state()
+        clear_state()
 
 
 def lint_packages(repo, shas):
@@ -629,7 +661,7 @@ def cmd_pick(repo, a):
             gitout("rev-parse", "--verify", h + "^{commit}").strip() for h in a.commits
         ]
     if not a.dry_run:
-        require_clean()
+        require_clean(repo)
     run_queue(repo, shas, {}, a.force, a.dry_run, not a.no_lint)
 
 
@@ -641,46 +673,23 @@ def cmd_skip(repo, a):
             reason = f" {a.message}" if a.message else ""
             f.write(f"{c.sha} #{reason} ({c.subject})\n")
             print(f"skipped {c.short} {c.subject}")
-    chezmoi_readd(repo.skipfile)
-
-
-def chezmoi_readd(path):
-    """Copy the skip file back to the chezmoi source if chezmoi manages it."""
-    if not shutil.which("chezmoi"):
-        return
-    path = os.path.abspath(path)
-    r = subprocess.run(
-        ["chezmoi", "source-path", path], capture_output=True, text=True, check=False
-    )
-    if r.returncode != 0:
-        return
-    src = r.stdout.strip()
-    if subprocess.run(["chezmoi", "re-add", path], check=False).returncode != 0:
-        print(f"warning: chezmoi re-add {path} failed", file=sys.stderr)
-        return
-    srcdir = subprocess.run(
-        ["chezmoi", "source-path"], capture_output=True, text=True, check=False
-    ).stdout.strip()
-    rel = os.path.relpath(src, srcdir)
-    print(
-        f"\nupdated {src}, commit it with:\n"
-        f"  chezmoi git -- commit -m 'Update chimera-sync skips' -- {rel}\n"
-        "  chezmoi git push"
-    )
+    rel = os.path.relpath(repo.skipfile)
+    if not rel.startswith(".."):
+        print(
+            f"\nrecorded in {rel}, commit it with:\n"
+            f"  git add {rel} && git commit -m 'Skip upstream commits' -- {rel}"
+        )
 
 
 def default_skip_file():
-    if os.environ.get("CHIMERA_SYNC_SKIP"):
-        return os.environ["CHIMERA_SYNC_SKIP"]
-    cfg = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    return os.path.join(cfg, "chimera-sync", "skip")
+    return os.environ.get("CHIMERA_SYNC_SKIP")
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--upstream", default="upstream/master")
     p.add_argument("--base", help="start of the range (default: merge-base)")
-    p.add_argument("--skip-file", default=default_skip_file())
+    p.add_argument("--skip-file", default=default_skip_file(), help="default: ./" + SKIPFILE)
     p.set_defaults(func=cmd_pending, files=False, dates=False)
     sub = p.add_subparsers()
     sp = sub.add_parser("pending", help="list commits not applied yet")
