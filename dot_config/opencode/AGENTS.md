@@ -28,3 +28,8 @@
 
 - Tickets are tracked on redmine.netgate.com and information can be read
   using ~/.local/bin/redmine-get script.
+
+## Misc
+
+- My local shell on macbook and almost all dev machines is zsh, take it into
+  account when planing shell code to execute on boxes

@@ -5,6 +5,9 @@
 window-height = 27
 window-width = 116
 
+# Scrollback per surface, in bytes (default is 10MB)
+scrollback-limit = 5000000
+
 # Initial window directory
 working-directory = home
 window-inherit-working-directory = false
