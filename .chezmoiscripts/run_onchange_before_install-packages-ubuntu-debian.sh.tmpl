@@ -36,10 +36,10 @@ fi
 mkdir -p "$HOME/.local/bin"
 # Pin a specific bob release and verify its checksum before running it;
 # upgrades are deliberate edits to this block
-bobver=v4.2.0
+bobver=v4.3.0
 case "{{ .chezmoi.arch }}" in
-    amd64) asset=bob-linux-x86_64.zip; sum=c5eb4341f10030eab6aa5ea7363afbee27d1c0835dba29447d3150ebab8f3f1a ;;
-    arm64) asset=bob-linux-arm.zip; sum=60f9739b3450c6d8c28067e7b88126442dde1d97c614c7c621109e0260b9bae3 ;;
+    amd64) asset=bob-linux-x86_64.zip; sum=5c8fa75c47d53062d121284be6fe0c6ede37ad722722170411b0056b991b62e0 ;;
+    arm64) asset=bob-linux-arm.zip; sum=63d541d4f2d68d6e68e9ff61e5c995c699fe9392ac6105efdb9a41a87e421c2d ;;
     *) echo "ERROR: unsupported architecture {{ .chezmoi.arch }}" >&2; exit 1 ;;
 esac
 bobtmp=$(mktemp -d)
