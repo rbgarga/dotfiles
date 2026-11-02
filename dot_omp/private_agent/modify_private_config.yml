@@ -1,0 +1,38 @@
+{{/* chezmoi:modify-template */}}
+{{- /* omp rewrites config.yml itself (model roles, setupVersion, ...), so
+       only set the keys managed here and keep everything else. Both the
+       theme and the status line are only defaults: a value changed later is
+       kept. They mirror Claude Code: ~/.claude/themes/gruvbox.json and
+       ~/.claude/statusline.sh (model, directory, git, PR, context usage and
+       the 5h/7d rate limit windows). */ -}}
+{{- $config := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $config = fromYaml .chezmoi.stdin -}}
+{{- end -}}
+
+{{- /* The theme file lives in ~/.omp/agent/themes/claude-gruvbox.json. The
+       built-in dark-gruvbox was the previous default, so it is replaced. */ -}}
+{{- $theme := get $config "theme" | default dict -}}
+{{- if or (not (hasKey $theme "dark")) (eq (get $theme "dark") "dark-gruvbox") -}}
+{{-   $_ := set $theme "dark" "claude-gruvbox" -}}
+{{- end -}}
+{{- $_ := set $config "theme" $theme -}}
+
+{{- $statusLine := get $config "statusLine" | default dict -}}
+{{- $defaults := dict
+      "preset" "custom"
+      "separator" "none"
+      "transparent" true
+      "leftSegments" (list "model" "path" "git" "pr" "context_pct" "usage")
+      "rightSegments" (list)
+      "segmentOptions" (dict
+        "model" (dict "showThinkingLevel" true)
+        "path" (dict "abbreviate" true "maxLength" 40)
+        "git" (dict "showBranch" true "showStaged" true "showUnstaged" true "showUntracked" true)) -}}
+{{- range $key, $value := $defaults -}}
+{{-   if not (hasKey $statusLine $key) -}}
+{{-     $_ := set $statusLine $key $value -}}
+{{-   end -}}
+{{- end -}}
+{{- $_ := set $config "statusLine" $statusLine -}}
+{{ toYaml $config }}
