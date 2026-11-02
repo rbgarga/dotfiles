@@ -1,0 +1,15 @@
+{{/* chezmoi:modify-template */}}
+{{- /* Codex also writes config.toml. Preserve local settings and use Gruvbox
+       only as a default, keeping later choices made with /theme. */ -}}
+{{- $config := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $config = fromToml .chezmoi.stdin -}}
+{{- end -}}
+{{- if not (hasKey $config "tui") -}}
+{{-   $_ := set $config "tui" (dict) -}}
+{{- end -}}
+{{- $tui := get $config "tui" -}}
+{{- if not (hasKey $tui "theme") -}}
+{{-   $_ := set $tui "theme" "gruvbox-dark" -}}
+{{- end -}}
+{{ toToml $config | trim }}

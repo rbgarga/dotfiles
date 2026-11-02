@@ -156,6 +156,12 @@ API rate limits). After an intentional `:Lazy sync` in nvim, run
 
 ## Layout notes
 
+- `dot_config/opencode/AGENTS.md` — shared global agent rules, also rendered
+  into `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`. Agent configs are
+  deployed on desktops and `garga-*-dev` hosts.
+- `dot_codex/` — Codex CLI config. Gruvbox Dark is the default syntax theme;
+  existing settings and later `/theme` choices are preserved. The terminal
+  palette comes from the terminal config (Gruvbox in Ghostty).
 - `dot_config/nvim/` — LazyVim config (extras in `lazyvim.json`)
 - `dot_vimrc`, `dot_vim/` — legacy vim fallback, still deployed everywhere
 - `dot_local/bin/` — helper scripts, deployed to `~/.local/bin` as executables
