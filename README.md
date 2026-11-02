@@ -157,8 +157,9 @@ API rate limits). After an intentional `:Lazy sync` in nvim, run
 ## Layout notes
 
 - `dot_config/opencode/AGENTS.md` — shared global agent rules, also rendered
-  into `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md`. Agent configs are
-  deployed on desktops and `garga-*-dev` hosts.
+  into `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and
+  `~/.omp/agent/AGENTS.md`. Agent configs are deployed on desktops and
+  `garga-*-dev` hosts.
 - `dot_codex/` — Codex CLI config. Gruvbox Dark is the default syntax theme;
   existing settings and later `/theme` choices are preserved. The terminal
   palette comes from the terminal config (Gruvbox in Ghostty).
