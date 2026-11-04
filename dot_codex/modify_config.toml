@@ -1,6 +1,6 @@
 {{/* chezmoi:modify-template */}}
-{{- /* Codex also writes config.toml. Preserve local settings and use Gruvbox
-       only as a default, keeping later choices made with /theme. */ -}}
+{{- /* Codex also writes config.toml. Preserve local settings and use theme
+       and status line defaults, keeping later /theme and /statusline choices. */ -}}
 {{- $config := dict -}}
 {{- if .chezmoi.stdin -}}
 {{-   $config = fromToml .chezmoi.stdin -}}
@@ -11,5 +11,15 @@
 {{- $tui := get $config "tui" -}}
 {{- if not (hasKey $tui "theme") -}}
 {{-   $_ := set $tui "theme" "gruvbox-dark" -}}
+{{- end -}}
+{{- if not (hasKey $tui "status_line") -}}
+{{-   $_ := set $tui "status_line" (list
+        "model-with-reasoning"
+        "current-dir"
+        "git-branch"
+        "context-used"
+        "five-hour-limit"
+        "weekly-limit"
+      ) -}}
 {{- end -}}
 {{ toToml $config | trim }}
