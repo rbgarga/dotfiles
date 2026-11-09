@@ -16,6 +16,12 @@ Commits can also be marked as skipped in a file tracked in the cports
 repository (.skipped-upstream-commits at its top level, or the path in
 $CHIMERA_SYNC_SKIP), so it is committed and shared like any other change.
 
+Commits that need remapping (other category) or trimming (packages we do
+not carry) are cherry-picked from a synthetic commit that holds only the
+relevant paths, under our names, so a conflict leaves a regular
+cherry-pick in progress. A package moved between categories upstream is
+picked as the change in its content.
+
 Commands:
   pending          list relevant commits that were not applied (default)
   show HASH        show the patch that pick would apply
@@ -272,23 +278,36 @@ class Repo:
     def in_sync(self, c):
         """Every file the commit touches (missing counts too) is the same
         here and in upstream's current tree."""
-        specs = []
+        # a moved package has two upstream paths for one of ours, only the
+        # one that still exists there counts
+        srcs = {}
         for p in c.keep:
-            specs += [f"{self.head}:{ours_path(c, p)}", f"{self.upstream}:{p}"]
+            srcs.setdefault(ours_path(c, p), []).append(p)
+        specs = []
+        for dst, ps in srcs.items():
+            specs.append(f"{self.head}:{dst}")
+            specs += [f"{self.upstream}:{p}" for p in ps]
         out = git(
             "cat-file", "--batch-check=%(objectname)", input="\n".join(specs) + "\n"
         ).stdout.splitlines()
         objs = [None if ln.endswith(" missing") else ln for ln in out]
-        return all(objs[i] == objs[i + 1] for i in range(0, len(objs), 2))
+        i = 0
+        for ps in srcs.values():
+            there = [o for o in objs[i + 1 : i + 1 + len(ps)] if o]
+            if objs[i] != (there[0] if there else None):
+                return False
+            i += 1 + len(ps)
+        return True
 
     def reverse_applies(self, c):
+        patch = self.patch(c)
         idx = os.path.join(gitdir(), "chimera-sync.index")
         env = dict(os.environ, GIT_INDEX_FILE=idx)
         try:
             subprocess.run(["git", "read-tree", self.head], env=env, check=True)
             res = subprocess.run(
                 ["git", "apply", "--check", "--cached", "-R", "-"],
-                input=self.patch(c),
+                input=patch,
                 env=env,
                 capture_output=True,
                 check=False,
@@ -298,31 +317,91 @@ class Repo:
             if os.path.exists(idx):
                 os.unlink(idx)
 
+    def trees(self, c):
+        """Our tree with the relevant paths, under our names, as upstream
+        had them before the commit and after it. A path moved between
+        categories exists on one side only, so both names collapse into
+        ours and what is left is the change in its content."""
+        idx = os.path.join(gitdir(), "chimera-sync-trees.index")
+        env = dict(os.environ, GIT_INDEX_FILE=idx)
+        trees = []
+        try:
+            for rev in (f"{c.sha}^", c.sha):
+                info = {ours_path(c, p): None for p in c.keep}
+                for ln in gitout("ls-tree", "-r", "-z", rev, "--", *c.keep).split("\0"):
+                    if ln:
+                        meta, path = ln.split("\t", 1)
+                        mode, _, sha = meta.split()
+                        info[ours_path(c, path)] = (mode, sha)
+                lines = [
+                    f"{v[0]} {v[1]}\t{p}" if v else f"0 {'0' * 40}\t{p}"
+                    for p, v in info.items()
+                ]
+                if os.path.exists(idx):
+                    os.unlink(idx)
+                subprocess.run(["git", "read-tree", self.head], env=env, check=True)
+                subprocess.run(
+                    ["git", "update-index", "--index-info"],
+                    input="\n".join(lines) + "\n",
+                    text=True,
+                    env=env,
+                    check=True,
+                )
+                res = subprocess.run(
+                    ["git", "write-tree"],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                trees.append(res.stdout.strip())
+        finally:
+            if os.path.exists(idx):
+                os.unlink(idx)
+        return trees
+
+    def synthetic(self, c):
+        """Commit on top of HEAD that makes the changes of c under our
+        names, with its author, date and message; None if there are none."""
+        before, after = self.trees(c)
+        if before == after:
+            return None
+        info = gitout("log", "-1", "--format=%an%x00%ae%x00%ad", "--date=raw", c.sha)
+        name, email, date = info.rstrip("\n").split("\0")
+        env = dict(
+            os.environ,
+            GIT_AUTHOR_NAME=name,
+            GIT_AUTHOR_EMAIL=email,
+            GIT_AUTHOR_DATE=date,
+        )
+        parent = gitout("rev-parse", self.head).strip()
+        msgs = (f"chimera-sync: base of {c.short}\n", message(c))
+        for tree, msg in zip((before, after), msgs):
+            res = subprocess.run(
+                ["git", "commit-tree", tree, "-p", parent, "-F", "-"],
+                input=msg,
+                text=True,
+                env=env,
+                capture_output=True,
+                check=True,
+            )
+            parent = res.stdout.strip()
+        return parent
+
     def patch(self, c):
-        diff = git(
+        if not c.rename:
+            args = (f"{c.sha}^", c.sha, "--", *c.keep)
+        else:
+            args = self.trees(c)
+        return git(
             "diff-tree",
             "-p",
             "--binary",
             "--full-index",
             "--no-renames",
-            f"{c.sha}^",
-            c.sha,
-            "--",
-            *c.keep,
+            *args,
             binary=True,
         ).stdout
-        if not c.rename:
-            return diff
-        lines = diff.split(b"\n")
-        for i, ln in enumerate(lines):
-            if not ln.startswith((b"diff --git ", b"--- ", b"+++ ")):
-                continue
-            for src, dst in c.rename.items():
-                for pfx in (b"a/", b"b/"):
-                    s, d = pfx + src.encode(), pfx + dst.encode()
-                    ln = re.sub(re.escape(s) + rb"(?=/|$|\s)", d, ln)
-            lines[i] = ln
-        return b"\n".join(lines)
 
 
 def ours_path(c, path):
@@ -359,7 +438,7 @@ def load_state():
         return None
     with open(state_path()) as f:
         st = json.load(f)
-    if "mode" not in st:
+    if st.get("mode") != "cherry-pick":
         print("dropping pick state left by an older chimera-sync", file=sys.stderr)
         clear_state()
         return None
@@ -392,25 +471,6 @@ def trailer_shas(base, head="HEAD"):
         if r.returncode == 0:
             shas.add(r.stdout.strip())
     return shas
-
-
-def commit_meta(meta):
-    if nothing_staged():
-        return False
-    env = dict(os.environ)
-    env["GIT_AUTHOR_NAME"] = meta["name"]
-    env["GIT_AUTHOR_EMAIL"] = meta["email"]
-    env["GIT_AUTHOR_DATE"] = meta["date"]
-    res = subprocess.run(
-        ["git", "commit", "-q", "--no-verify", "-F", "-"],
-        input=meta["msg"],
-        text=True,
-        env=env,
-        check=False,
-    )
-    if res.returncode != 0:
-        sys.exit("commit failed")
-    return True
 
 
 def dirty(repo):
@@ -447,11 +507,9 @@ def require_clean(repo):
         sys.exit("working tree has uncommitted changes")
 
 
-def apply_commit(repo, c, force):
-    """Returns (result, state) where result is applied, empty, refused or
-    conflict; state is what 'continue' needs after a conflict."""
-    if "category-move" in c.tags and not force:
-        return "refused", None
+def apply_commit(repo, c):
+    """Returns (result, state) where result is applied, empty or conflict;
+    state is what 'continue' needs after a conflict."""
     if not c.rename and not c.dropped:
         r = subprocess.run(["git", "cherry-pick", "-x", c.sha], check=False)
         if r.returncode == 0:
@@ -459,16 +517,17 @@ def apply_commit(repo, c, force):
         if not picking():
             sys.exit(f"cherry-pick of {c.short} failed")
         return "conflict", {"mode": "cherry-pick"}
-    info = gitout("log", "-1", "--format=%an%x00%ae%x00%ad", "--date=raw", c.sha)
-    name, email, date = info.rstrip("\n").split("\0")
-    meta = {"name": name, "email": email, "date": date, "msg": message(c)}
-    res = git(
-        "apply", "-3", "--index", "-", input=repo.patch(c), check=False, binary=True
-    )
-    if res.returncode != 0:
-        sys.stderr.write(res.stderr.decode())
-        return "conflict", {"mode": "apply", "meta": meta}
-    return ("applied" if commit_meta(meta) else "empty"), None
+    synth = repo.synthetic(c)
+    if not synth:
+        return "empty", None
+    before = gitout("rev-parse", "HEAD").strip()
+    r = subprocess.run(["git", "cherry-pick", "--empty=drop", synth], check=False)
+    if r.returncode == 0:
+        moved = gitout("rev-parse", "HEAD").strip() != before
+        return ("applied" if moved else "empty"), None
+    if not picking():
+        sys.exit(f"cherry-pick of {c.short} failed")
+    return "conflict", {"mode": "cherry-pick"}
 
 
 REPORT = (
@@ -477,7 +536,6 @@ REPORT = (
     ("insync", "files already match upstream"),
     ("irrelevant", "nothing to pick"),
     ("empty", "empty, consider skip"),
-    ("refused", "category move, not picked"),
     ("dropped", "not applied"),
 )
 
@@ -519,18 +577,15 @@ def run_queue(repo, queue, report, force=False, dry=False, lint=True):
             key = "insync" if how == "in-sync" else "already"
             report.setdefault(key, []).append(sha)
             continue
-        res, st = apply_commit(repo, c, force)
+        res, st = apply_commit(repo, c)
         if res == "conflict":
             st.update(current=sha, queue=queue, report=report, force=force, lint=lint)
             save_state(st)
             print_report(report, sha, queue)
-            if st["mode"] == "cherry-pick":
-                how = "'git add' them (or 'git cherry-pick --continue')"
-            else:
-                how = "'git add' them"
             print(
-                f"\nresolve the conflicts, {how} and run 'chimera-sync continue'"
-                " to commit and go on with the rest, or 'chimera-sync abort'"
+                "\nresolve the conflicts, 'git add' them (or 'git cherry-pick"
+                " --continue') and run 'chimera-sync continue' to commit and"
+                " go on with the rest, or 'chimera-sync abort'"
             )
             sys.exit(1)
         report.setdefault(res, []).append(sha)
@@ -578,27 +633,24 @@ def cmd_continue(repo, a):
     if gitout("diff", "--name-only", "--diff-filter=U").strip():
         sys.exit("there are still unmerged files")
     sha = st["current"]
-    if st["mode"] == "cherry-pick":
-        if picking():
-            if nothing_staged():
-                git("cherry-pick", "--skip")
-                res = "empty"
-            else:
-                r = subprocess.run(
-                    ["git", "cherry-pick", "--continue"],
-                    env=dict(os.environ, GIT_EDITOR="true"),
-                    check=False,
-                )
-                if r.returncode != 0:
-                    sys.exit("git cherry-pick --continue failed")
-                res = "applied"
-        elif sha in trailer_shas(repo.base):
-            res = "applied"
+    if picking():
+        if nothing_staged():
+            git("cherry-pick", "--skip")
+            res = "empty"
         else:
-            # finished by hand with git cherry-pick --skip or --abort
-            res = "dropped"
+            r = subprocess.run(
+                ["git", "cherry-pick", "--continue"],
+                env=dict(os.environ, GIT_EDITOR="true"),
+                check=False,
+            )
+            if r.returncode != 0:
+                sys.exit("git cherry-pick --continue failed")
+            res = "applied"
+    elif sha in trailer_shas(repo.base):
+        res = "applied"
     else:
-        res = "applied" if commit_meta(st["meta"]) else "empty"
+        # finished by hand with git cherry-pick --skip or --abort
+        res = "dropped"
     st["report"].setdefault(res, []).append(sha)
     lint = st.get("lint", True) and not a.no_lint
     run_queue(repo, st["queue"], st["report"], st["force"], lint=lint)
@@ -610,8 +662,6 @@ def cmd_abort(repo, a):
         sys.exit("no pick in progress")
     if picking():
         git("cherry-pick", "--abort")
-    elif st["mode"] == "apply":
-        git("reset", "-q", "--merge")
     clear_state()
     print_report(st["report"], st["current"], st["queue"], "aborted")
 
