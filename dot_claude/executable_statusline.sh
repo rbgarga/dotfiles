@@ -47,6 +47,78 @@ IFS='	' read -r model effort fast dir worktree pr_num pr_state ctx h5 h5_reset d
 $fields
 EOF
 
+# The session JSON only carries rate_limits once this session got its
+# first API response (they come from response headers), and never the
+# per-model weekly windows (e.g. Fable). Both come from the claude.ai
+# usage endpoint behind /usage, fetched in the background and cached
+# for all sessions, so the status line never waits for it.
+cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}/claude-statusline
+usage_cache=$cache_dir/usage.json
+usage_stamp=$cache_dir/usage.stamp
+usage_ttl_min=2
+
+oauth_token() {
+	if [ "$(uname)" = Darwin ]; then
+		security find-generic-password -s 'Claude Code-credentials' -w 2>/dev/null
+	else
+		cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null
+	fi | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null
+}
+
+refresh_usage() {
+	mkdir -p "$cache_dir" 2>/dev/null || return
+	[ -n "$(find "$usage_stamp" -mmin -"$usage_ttl_min" 2>/dev/null)" ] && return
+	# A lock left behind by a killed refresh must not block the next ones.
+	find "$cache_dir" -maxdepth 1 -name lock -mmin +1 -exec rmdir {} + 2>/dev/null
+	mkdir "$cache_dir/lock" 2>/dev/null || return
+	touch "$usage_stamp"
+	(
+		trap 'rmdir "$cache_dir/lock"' EXIT
+		token=$(oauth_token)
+		[ -n "$token" ] || exit 0
+		tmp=$usage_cache.$$
+		if curl -sf -m 10 -H "Authorization: Bearer $token" \
+		    -H 'anthropic-beta: oauth-2025-04-20' \
+		    https://api.anthropic.com/api/oauth/usage -o "$tmp" &&
+		    jq -e 'type == "object"' "$tmp" >/dev/null 2>&1; then
+			mv -f "$tmp" "$usage_cache"
+		else
+			rm -f "$tmp"
+		fi
+	) </dev/null >/dev/null 2>&1 &
+}
+
+refresh_usage
+
+# Windows whose reset already passed are stale and dropped.
+scoped="-"
+if [ -s "$usage_cache" ]; then
+	usage=$(jq -r '
+		def epoch: if type == "string" then
+			sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601
+			else . end;
+		def live: select(. != null and .resets_at != null
+			and (.resets_at | epoch) > now);
+		def pct: if . == null then "-" else floor | tostring end;
+		[
+			(.five_hour | live | .utilization | pct) // "-",
+			(.five_hour | live | .resets_at | epoch | tostring) // "-",
+			(.seven_day | live | .utilization | pct) // "-",
+			([.limits[]? | select(.kind == "weekly_scoped") | live
+				| "\(.scope.model.display_name | ascii_downcase)=\(.percent | pct)"]
+				| if length == 0 then "-" else join(";") end)
+		] | join("\t")' "$usage_cache" 2>/dev/null)
+	IFS='	' read -r u_h5 u_h5_reset u_d7 scoped <<EOF
+$usage
+EOF
+	if [ "$h5" = "-" ] && [ -n "$u_h5" ]; then
+		h5=$u_h5
+		h5_reset=$u_h5_reset
+	fi
+	[ "$d7" = "-" ] && [ -n "$u_d7" ] && d7=$u_d7
+	[ -z "$scoped" ] && scoped="-"
+fi
+
 sep="  "
 cols=${COLUMNS:-80}
 
@@ -117,6 +189,15 @@ if [ "$h5" != "-" ]; then
 	add "$r"
 fi
 [ "$d7" != "-" ] && add "${gray}7d${reset} ${d7}%"
+
+if [ "$scoped" != "-" ]; then
+	old_ifs=$IFS
+	IFS=';'
+	for s in $scoped; do
+		[ "${s#*=}" != "-" ] && add "${gray}${s%%=*}${reset} ${s#*=}%"
+	done
+	IFS=$old_ifs
+fi
 
 # Dropped first on narrow terminals.
 if [ "$cols" -ge 100 ]; then
