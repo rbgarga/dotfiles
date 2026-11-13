@@ -26,8 +26,14 @@
 
 ## Bug tickets
 
-- Tickets are tracked on redmine.netgate.com and information can be read
-  using ~/.local/bin/redmine-get script.
+- Tickets are tracked on redmine.netgate.com and redmine.pfsense.org.
+  Information can be read using ~/.local/bin/redmine-get script, which
+  queries redmine.netgate.com by default. Use `-s pfsense` to query
+  redmine.pfsense.org, e.g.:
+  `redmine-get -s pfsense '/issues/12345.json?include=journals'`
+- When a ticket URL is given, its host tells which server to use. When
+  only a ticket number is given and the server is not clear from the
+  context, ask the user.
 
 ## Misc
 

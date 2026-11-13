@@ -2,39 +2,78 @@
 #
 # redmine-get - Read-only access to Redmine REST API
 #
-# Usage: redmine-get <api_path>
+# Usage: redmine-get [-s server] <api_path>
+#
+#   -s server   Redmine server to query:
+#                 netgate  https://redmine.netgate.com (default)
+#                 pfsense  https://redmine.pfsense.org
 #
 #   redmine-get '/issues.json?project_id=tnsr&status_id=open&limit=25'
 #   redmine-get '/issues/12345.json?include=journals,relations'
+#   redmine-get -s pfsense '/issues/15000.json?include=journals'
 #
-# API key: on macOS it is read from the Keychain, item created with:
+# Each server has its own API key.  On macOS it is read from the
+# Keychain, items created with:
 #   security add-generic-password -a "$USER" -s redmine-api-key -w
+#   security add-generic-password -a "$USER" -s redmine-pfsense-api-key -w
 # On other systems it is read from a file that only the owner can access
 # (no group/other permissions, otherwise the script refuses to use it):
 #   mkdir -p ~/.config/redmine && chmod 700 ~/.config/redmine
 #   (umask 077; cat > ~/.config/redmine/api-key)
+#   (umask 077; cat > ~/.config/redmine/pfsense-api-key)
 #
 # The key is sent only in the X-Redmine-API-Key header, passed to curl
 # through stdin so it never shows up in the process list, and it is
 # redacted from the output.  Only GET requests are performed.
 #
 # Environment:
-#   REDMINE_URL           Redmine base URL (https only)
-#   REDMINE_KEYCHAIN_ITEM Keychain service name (default: redmine-api-key)
+#   REDMINE_URL           Redmine base URL (https only), overrides the
+#                         one of the selected server
+#   REDMINE_KEYCHAIN_ITEM Keychain service name
+#                         (default: redmine-api-key or
+#                         redmine-pfsense-api-key)
 #   REDMINE_KEY_FILE      Key file on non-macOS systems
-#                         (default: ~/.config/redmine/api-key)
+#                         (default: ~/.config/redmine/api-key or
+#                         ~/.config/redmine/pfsense-api-key)
 
 set -eu
-
-: "${REDMINE_URL:=https://redmine.netgate.com}"
-: "${REDMINE_KEYCHAIN_ITEM:=redmine-api-key}"
 
 die() {
 	echo "$(basename "$0"): $*" >&2
 	exit 1
 }
 
-[ $# -eq 1 ] || die "usage: $(basename "$0") <api_path>"
+usage() {
+	die "usage: $(basename "$0") [-s netgate|pfsense] <api_path>"
+}
+
+server=netgate
+while getopts s: opt; do
+	case "${opt}" in
+		s) server=${OPTARG} ;;
+		*) usage ;;
+	esac
+done
+shift $((OPTIND - 1))
+
+[ $# -eq 1 ] || usage
+
+case "${server}" in
+	netgate)
+		default_url=https://redmine.netgate.com
+		key_name=api-key
+		;;
+	pfsense)
+		default_url=https://redmine.pfsense.org
+		key_name=pfsense-api-key
+		;;
+	*)
+		die "unknown server: ${server} (use netgate or pfsense)"
+		;;
+esac
+
+: "${REDMINE_URL:=${default_url}}"
+: "${REDMINE_KEYCHAIN_ITEM:=redmine-${key_name}}"
 
 path=$1
 
@@ -64,7 +103,7 @@ if [ "$(uname -s)" = Darwin ]; then
 	    -s "${REDMINE_KEYCHAIN_ITEM}" -w 2>/dev/null) \
 	    || die "API key not found in Keychain (${REDMINE_KEYCHAIN_ITEM})"
 else
-	keyfile=${REDMINE_KEY_FILE:-${XDG_CONFIG_HOME:-${HOME}/.config}/redmine/api-key}
+	keyfile=${REDMINE_KEY_FILE:-${XDG_CONFIG_HOME:-${HOME}/.config}/redmine/${key_name}}
 	[ -f "${keyfile}" ] || die "API key file not found (${keyfile})"
 	# ls is the portable way to read the mode (stat differs on BSD/GNU)
 	# shellcheck disable=SC2012
