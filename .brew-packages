@@ -15,3 +15,11 @@ golangci-lint
 hadolint
 jq
 bash
+{{ if .desktop -}}
+neomutt
+isync
+msmtp
+notmuch
+w3m
+urlscan
+{{ end -}}

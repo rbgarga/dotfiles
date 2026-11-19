@@ -28,3 +28,14 @@ tflint
 tree-sitter-cli
 unzip
 jq
+{{ if .desktop -}}
+neomutt
+isync
+security/cyrus-sasl-xoauth2
+msmtp
+notmuch
+w3m
+textproc/py-urlscan
+perl5
+p5-IO-Socket-SSL
+{{ end -}}
