@@ -1,0 +1,367 @@
+#!/usr/bin/env perl
+#
+# nntp-sync - Mirror gmane newsgroups into local Maildirs
+#
+# Usage: nntp-sync [-v] [group ...]
+#        nntp-sync [-v] --backfill <group> <days>
+#
+#   -v          print progress to stderr
+#   group       full gmane name or short name; default: every group in
+#               the groups file
+#   --backfill  also fetch the articles of the last <days> days that are
+#               older than the oldest one already mirrored, marked read
+#
+# The groups are listed in ~/.config/nntp-sync/groups, one per line:
+#   <gmane group> <short name> <initial depth in days>
+# and each is mirrored into ~/Mail/lists/<short name>, where notmuch
+# indexes it.  The first run of a group fetches the last <depth> days,
+# found by a binary search on the overview dates, into cur/ marked read.
+# Later runs fetch only the new articles, into new/.  Cross-posts are
+# stored in each group; notmuch merges them by Message-ID.  The state of
+# each group is kept in ~/.local/state/nntp-sync/<short name>: the first
+# and last mirrored article numbers, and the last one of the initial
+# history (delivered read, also when a first run is interrupted).
+#
+# Connects to news.gmane.io:119, with STARTTLS when the server offers it
+# (needs IO::Socket::SSL), plain otherwise.  No authentication.
+#
+# Exit status: 0 success, 1 a group or the connection failed, 2 usage or
+# groups file error, 3 another nntp-sync is running.
+#
+# Environment:
+#   NNTP_SYNC_SERVER  server (default: news.gmane.io)
+#   NNTP_SYNC_GROUPS  groups file (default: ~/.config/nntp-sync/groups)
+#   NNTP_SYNC_MAILDIR Maildir root (default: ~/Mail/lists)
+
+use strict;
+use warnings;
+
+use File::Basename qw(basename);
+use File::Path qw(make_path);
+use Getopt::Long qw(:config no_ignore_case);
+use Net::NNTP;
+use Sys::Hostname qw(hostname);
+use Time::HiRes ();
+use Time::Local qw(timegm);
+
+my $prog = basename($0);
+my $home = $ENV{HOME} or die "$prog: HOME is not set\n";
+my $server = $ENV{NNTP_SYNC_SERVER} || 'news.gmane.io';
+my $groups_file = $ENV{NNTP_SYNC_GROUPS}
+    || ($ENV{XDG_CONFIG_HOME} || "$home/.config") . '/nntp-sync/groups';
+my $maildir_root = $ENV{NNTP_SYNC_MAILDIR} || "$home/Mail/lists";
+my $state_dir = ($ENV{XDG_STATE_HOME} || "$home/.local/state")
+    . '/nntp-sync';
+my $lock_dir = "$state_dir/lock";
+
+# Overview articles fetched per request while probing dates
+my $window = 200;
+
+my $verbose = 0;
+my @backfill;
+
+sub usage {
+	print STDERR "usage: $prog [-v] [group ...]\n",
+	    "       $prog [-v] --backfill <group> <days>\n";
+	exit 2;
+}
+
+sub note { print STDERR "$prog: @_\n" if $verbose }
+sub warning { print STDERR "$prog: @_\n" }
+
+GetOptions(
+	'v|verbose' => \$verbose,
+	'backfill' => \my $backfill,
+) or usage();
+if ($backfill) {
+	usage() unless @ARGV == 2 && $ARGV[1] =~ /^\d+$/;
+	@backfill = splice(@ARGV);
+}
+
+# --- groups file ----------------------------------------------------
+
+my (@groups, %by_name);
+{
+	open(my $fh, '<', $groups_file)
+	    or do { warning("cannot open $groups_file: $!"); exit 2 };
+	while (my $line = <$fh>) {
+		$line =~ s/#.*//;
+		next unless $line =~ /\S/;
+		my ($name, $short, $days) = split(' ', $line);
+		unless (defined $days && $days =~ /^\d+$/
+		    && $short =~ /^[\w.+-]+$/) {
+			warning("$groups_file:$.: expected <group> <short name> <days>");
+			exit 2;
+		}
+		my $g = { name => $name, short => $short, days => $days };
+		push @groups, $g;
+		$by_name{$name} = $by_name{$short} = $g;
+	}
+	close($fh);
+}
+
+sub lookup {
+	my ($arg) = @_;
+	return $by_name{$arg} if $by_name{$arg};
+	warning("unknown group $arg (not in $groups_file)");
+	exit 2;
+}
+
+my @selected;
+if (@backfill) {
+	@selected = (lookup($backfill[0]));
+} elsif (@ARGV) {
+	@selected = map { lookup($_) } @ARGV;
+} else {
+	@selected = @groups;
+}
+
+# --- lock -----------------------------------------------------------
+
+make_path($state_dir);
+my $have_lock = 0;
+for my $try (1, 2) {
+	if (mkdir($lock_dir)) {
+		$have_lock = 1;
+		last;
+	}
+	# A lock left behind by a process that is gone is taken over
+	my $pid = '';
+	if (open(my $fh, '<', "$lock_dir/pid")) {
+		$pid = <$fh> // '';
+		chomp($pid);
+		close($fh);
+	}
+	if ($try == 2 || ($pid =~ /^\d+$/ && kill(0, $pid))) {
+		warning("another $prog is running" . ($pid ? " (pid $pid)" : ''));
+		exit 3;
+	}
+	unlink("$lock_dir/pid");
+	rmdir($lock_dir);
+}
+if (open(my $fh, '>', "$lock_dir/pid")) {
+	print $fh "$$\n";
+	close($fh);
+}
+END {
+	if ($have_lock) {
+		unlink("$lock_dir/pid");
+		rmdir($lock_dir);
+	}
+}
+$SIG{$_} = sub { exit 1 } for qw(HUP INT TERM);
+
+# --- state ----------------------------------------------------------
+
+# (first, last, history end), empty for a group never mirrored
+sub read_state {
+	my ($g) = @_;
+	open(my $fh, '<', "$state_dir/$g->{short}") or return;
+	my @state = split(' ', <$fh> // '');
+	close($fh);
+	return unless @state == 3 && !grep { !/^\d+$/ } @state;
+	return @state;
+}
+
+sub write_state {
+	my ($g, @state) = @_;
+	my $file = "$state_dir/$g->{short}";
+	open(my $fh, '>', "$file.new") or die "cannot write $file.new: $!\n";
+	print $fh "@state\n";
+	close($fh) or die "cannot write $file.new: $!\n";
+	rename("$file.new", $file) or die "cannot rename $file.new: $!\n";
+}
+
+# --- dates ----------------------------------------------------------
+
+my %month;
+@month{qw(jan feb mar apr may jun jul aug sep oct nov dec)} = (0 .. 11);
+
+# RFC 5322 date to epoch, undef when it cannot be parsed
+sub parse_date {
+	my ($s) = @_;
+	return unless defined $s && $s =~
+	    /(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([+-]\d{4})?/;
+	my ($d, $mon, $y, $h, $mi, $sec, $tz) = ($1, lc($2), $3, $4, $5,
+	    $6 // 0, $7);
+	return unless exists $month{$mon};
+	$y += $y < 50 ? 2000 : 1900 if $y < 100;
+	my $t = eval { timegm($sec, $mi, $h, $d, $month{$mon}, $y) };
+	return unless defined $t;
+	if (defined $tz && $tz =~ /^([+-])(\d\d)(\d\d)$/) {
+		my $off = ($2 * 60 + $3) * 60;
+		$t += $1 eq '+' ? -$off : $off;
+	}
+	return $t;
+}
+
+# The first article numbered n or above (up to last) that has a
+# parseable date, as (number, epoch); empty when there is none
+sub probe {
+	my ($nntp, $n, $last) = @_;
+	while ($n <= $last) {
+		my $end = $n + $window - 1;
+		$end = $last if $end > $last;
+		my $over = $nntp->xover([$n, $end])
+		    or die "OVER $n-$end failed: " . $nntp->message;
+		for my $num (sort { $a <=> $b } keys %$over) {
+			my $t = parse_date($over->{$num}[2]);
+			return ($num, $t) if defined $t;
+		}
+		$n = $end + 1;
+	}
+	return;
+}
+
+# The first article in [lo, hi] dated at or after cutoff, hi + 1 when
+# there is none.  Article dates are taken as increasing with the number,
+# which holds closely enough on gmane.
+sub find_cutoff {
+	my ($nntp, $lo, $hi, $cutoff) = @_;
+	my $end = $hi + 1;
+	while ($lo < $end) {
+		my $mid = int(($lo + $end) / 2);
+		my ($num, $t) = probe($nntp, $mid, $hi);
+		if (!defined $num || $t >= $cutoff) {
+			$end = $mid;
+		} else {
+			$lo = $num + 1;
+		}
+	}
+	return $lo;
+}
+
+# --- Maildir --------------------------------------------------------
+
+(my $host = hostname()) =~ s{[/:]}{_}g;
+my $seq = 0;
+
+sub maildir_for {
+	my ($g) = @_;
+	my $dir = "$maildir_root/$g->{short}";
+	make_path(map { "$dir/$_" } qw(cur new tmp));
+	return $dir;
+}
+
+# Write the article through tmp/, then into new/, or into cur/ marked
+# read when seen is set
+sub deliver {
+	my ($dir, $lines, $seen) = @_;
+	my ($s, $us) = Time::HiRes::gettimeofday();
+	my $name = sprintf('%d.M%dP%dQ%d.%s', $s, $us, $$, ++$seq, $host);
+	my $tmp = "$dir/tmp/$name";
+	open(my $fh, '>:raw', $tmp) or die "cannot write $tmp: $!\n";
+	# NNTP lines end in CRLF, Maildir files in LF
+	print $fh map { s/\r\n\z/\n/r } @$lines;
+	close($fh) or die "cannot write $tmp: $!\n";
+	my $dest = $seen ? "$dir/cur/$name:2,S" : "$dir/new/$name";
+	rename($tmp, $dest) or die "cannot rename $tmp: $!\n";
+}
+
+# Fetch articles from..to into the group's Maildir.  Articles up to
+# seen_upto are delivered read.  Missing numbers (expired or cancelled
+# articles) are skipped.  progress is called with each number done.
+sub fetch {
+	my ($nntp, $g, $from, $to, $seen_upto, $progress) = @_;
+	my $dir = maildir_for($g);
+	my $count = 0;
+	for my $n ($from .. $to) {
+		if (my $lines = $nntp->article($n)) {
+			deliver($dir, $lines, $n <= $seen_upto);
+			$count++;
+			note("$g->{short}: $count articles") if $count % 500 == 0;
+		} elsif (($nntp->code // 0) != 423 && ($nntp->code // 0) != 430) {
+			die "ARTICLE $n failed: " . ($nntp->message // '') . "\n";
+		}
+		$progress->($n) if $progress;
+	}
+	return $count;
+}
+
+# --- sync -----------------------------------------------------------
+
+sub sync_group {
+	my ($nntp, $g, $backfill_days) = @_;
+	my (undef, $sfirst, $slast) = $nntp->group($g->{name})
+	    or die "GROUP failed: " . ($nntp->message // '') . "\n";
+	my ($first, $last, $hist) = read_state($g);
+
+	if (defined $backfill_days) {
+		defined $first or die "not mirrored yet, run $prog first\n";
+		my $cutoff = time() - $backfill_days * 86400;
+		my $from = find_cutoff($nntp, $sfirst, $first - 1, $cutoff);
+		if ($from >= $first) {
+			note("$g->{short}: nothing to backfill");
+			return 0;
+		}
+		note("$g->{short}: backfilling $from-" . ($first - 1));
+		# first only moves once the whole range is in; an interrupted
+		# backfill is rerun from the start
+		my $count = fetch($nntp, $g, $from, $first - 1, $first - 1);
+		write_state($g, $from, $last, $hist);
+		return $count;
+	}
+
+	if (!defined $first) {
+		my $cutoff = time() - $g->{days} * 86400;
+		$first = find_cutoff($nntp, $sfirst, $slast, $cutoff);
+		($last, $hist) = ($first - 1, $slast);
+		note("$g->{short}: first run, $g->{days} days from article $first");
+		write_state($g, $first, $last, $hist);
+	} elsif ($slast < $last) {
+		warning("$g->{name}: server is at article $slast, below the "
+		    . "mirrored $last; skipped (renumbered?)");
+		return 0;
+	}
+
+	my $from = $last + 1;
+	$from = $sfirst if $from < $sfirst;
+	return 0 if $from > $slast;
+	return fetch($nntp, $g, $from, $slast, $hist,
+	    sub { write_state($g, $first, $_[0], $hist) });
+}
+
+sub connect_server {
+	my $nntp = Net::NNTP->new($server, Port => 119, Timeout => 120)
+	    or die "cannot connect to $server: $@\n";
+	my @caps;
+	if ($nntp->command('CAPABILITIES')->response == Net::Cmd::CMD_INFO) {
+		@caps = @{$nntp->read_until_dot // []};
+	}
+	if (grep { /^STARTTLS\b/i } @caps) {
+		if (eval { require IO::Socket::SSL; 1 }) {
+			$nntp->starttls
+			    or die "STARTTLS with $server failed: "
+			    . ($nntp->message // $IO::Socket::SSL::SSL_ERROR) . "\n";
+			note("TLS with $server");
+		} else {
+			warning("IO::Socket::SSL missing, talking plain to $server");
+		}
+	}
+	return $nntp;
+}
+
+my $nntp = eval { connect_server() };
+if (!$nntp) {
+	warning($@ =~ s/\s+$//r);
+	exit 1;
+}
+
+my $rc = 0;
+for my $g (@selected) {
+	my $count = eval { sync_group($nntp, $g, @backfill ? $backfill[1] : undef) };
+	if (!defined $count) {
+		warning("$g->{name}: " . ($@ =~ s/\s+$//r));
+		$rc = 1;
+		# The connection may be unusable after an error
+		$nntp->quit;
+		$nntp = eval { connect_server() } or do {
+			warning($@ =~ s/\s+$//r);
+			exit 1;
+		};
+	} elsif ($count) {
+		print "$g->{short}: $count new\n";
+	}
+}
+$nntp->quit;
+exit $rc;
