@@ -1,0 +1,13 @@
+{{- if and (eq .chezmoi.os "darwin") .desktop -}}
+#!/bin/sh
+# onchange: {{ includeTemplate "Library/LaunchAgents/org.rbgarga.mail-sync.plist.tmpl" . | sha256sum }}
+# (Re)load the mail-sync launchd agent whenever its plist changes; launchd
+# keeps running the old definition until it is booted out.
+set -e
+
+label=org.rbgarga.mail-sync
+domain=gui/$(id -u)
+
+launchctl bootout "${domain}/${label}" 2>/dev/null || true
+launchctl bootstrap "${domain}" "$HOME/Library/LaunchAgents/${label}.plist"
+{{- end -}}

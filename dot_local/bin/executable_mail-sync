@@ -1,0 +1,109 @@
+#!/bin/sh
+#
+# mail-sync - Sync mail, mirror the lists and index everything
+#
+# Usage: mail-sync [-s] [personal|freebsd|work]
+#
+#   -s  scheduled run: do nothing until the first sync, done by hand, has
+#       created the notmuch database (~/Mail/.notmuch)
+#
+# Runs `mbsync -a` (or only the given account), then nntp-sync (only
+# when syncing every account), then `notmuch new`.  Every step runs even
+# when an earlier one fails, so one broken account does not stop the
+# others from being indexed; the exit status is 1 when any step failed.
+#
+# Run every 5 minutes by launchd on macOS (org.rbgarga.mail-sync, with -s)
+# and on demand from neomutt.  A second run while one is in progress
+# exits 0 right away.  Output and failures are logged, with a timestamp, to
+# ~/Library/Logs/mail-sync.log on macOS and ~/.local/state/mail-sync.log
+# elsewhere; past 1 MB the log is moved to mail-sync.log.0.
+
+set -u
+
+die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+usage() {
+	die "usage: $(basename "$0") [-s] [personal|freebsd|work]"
+}
+
+scheduled=
+while getopts s opt; do
+	case "${opt}" in
+		s) scheduled=1 ;;
+		*) usage ;;
+	esac
+done
+shift $((OPTIND - 1))
+
+account=
+case $# in
+	0) ;;
+	1)
+		case "$1" in
+			personal|freebsd|work) account=$1 ;;
+			*) usage ;;
+		esac
+		;;
+	*) usage ;;
+esac
+
+[ -z "${scheduled}" ] || [ -d "${HOME}/Mail/.notmuch" ] || exit 0
+
+state=${XDG_STATE_HOME:-${HOME}/.local/state}
+if [ "$(uname -s)" = Darwin ]; then
+	log=${HOME}/Library/Logs/mail-sync.log
+	# The XOAUTH2 plugin mbsync needs for Work, which the system libsasl2
+	# lacks (built by chezmoi)
+	export SASL_PATH="${SASL_PATH:-${HOME}/.local/lib/sasl2}"
+else
+	log=${state}/mail-sync.log
+fi
+lock=${state}/mail-sync.lock
+mkdir -p "${state}" "$(dirname "${log}")" || die "unable to create ${state}"
+
+# A lock left behind by a process that is gone is taken over
+if ! mkdir "${lock}" 2>/dev/null; then
+	pid=$(cat "${lock}/pid" 2>/dev/null) || pid=
+	if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+		exit 0
+	fi
+	rm -rf "${lock}"
+	mkdir "${lock}" 2>/dev/null || exit 0
+fi
+echo $$ > "${lock}/pid"
+trap 'rm -rf "${lock}"' EXIT
+trap 'exit 1' HUP INT TERM
+
+# Keep the log under 1 MB, with one older generation
+if [ -n "$(find "${log}" -size +1024k 2>/dev/null)" ]; then
+	mv -f "${log}" "${log}.0"
+fi
+
+rc=0
+# Log a step only when it prints something or fails, so the log does not
+# grow with every quiet run
+run() {
+	out=$("$@" 2>&1)
+	status=$?
+	now=$(date '+%Y-%m-%d %H:%M:%S')
+	[ -z "${out}" ] || printf '%s\n' "${out}" | sed "s/^/${now} $1: /"
+	if [ ${status} -ne 0 ]; then
+		echo "${now} $*: failed (exit ${status})"
+		rc=1
+	fi
+}
+
+{
+	if [ -n "${account}" ]; then
+		run mbsync -q "${account}"
+	else
+		run mbsync -q -a
+		run nntp-sync
+	fi
+	run notmuch new --quiet
+} >> "${log}"
+
+exit ${rc}

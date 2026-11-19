@@ -1,0 +1,10 @@
+{{- if and (eq .chezmoi.os "darwin") .desktop -}}
+#!/bin/sh
+# Keep the local mail copy (~/Mail, tens of GB) out of Spotlight and Time
+# Machine; Gmail and gmane hold the originals.
+set -e
+
+mkdir -p "$HOME/Mail"
+touch "$HOME/Mail/.metadata_never_index"
+tmutil addexclusion "$HOME/Mail"
+{{- end -}}
