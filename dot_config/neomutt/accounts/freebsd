@@ -1,0 +1,15 @@
+# FreeBSD: garga@FreeBSD.org, sent through smtp.FreeBSD.org (logs in to
+# Gmail as garga.bsd@gmail.com, never sends from it)
+set my_account = freebsd
+set real_name = "Renato Botelho"
+set from = "garga@FreeBSD.org"
+# Recipient identity: reverse_name only picks among these
+unalternates *
+alternates "^garga@freebsd\\.org$"
+set signature = "~/.config/neomutt/signatures/freebsd"
+unmy_hdr Organization
+set postponed = "+freebsd/drafts"
+# smtp.FreeBSD.org keeps no copy: record it, mbsync uploads it to Sent
+set my_record = "+freebsd/sent"
+set record = "+freebsd/sent"
+set my_reply_record = "+freebsd/sent"

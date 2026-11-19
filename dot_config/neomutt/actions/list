@@ -1,0 +1,4 @@
+# List views: the mirrored articles are local only and never pruned, so
+# Delete stays off (actions/default).  A reply goes to the list and the
+# author, by email from the FreeBSD identity.
+bind index,pager r group-reply

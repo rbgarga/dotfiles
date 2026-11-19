@@ -1,0 +1,13 @@
+# neomutt - three Gmail accounts and the gmane lists, all read from the
+# local Maildirs in ~/Mail (mbsync, nntp-sync) through notmuch.  See
+# docs/mail/ in the dotfiles repo.
+#
+# Order matters: folder-hooks run in the order they are defined, so the
+# per-mailbox hooks in mailboxes and lists override the defaults.
+
+source ~/.config/neomutt/settings
+source ~/.config/neomutt/colors
+source ~/.config/neomutt/bindings
+source ~/.config/neomutt/mailboxes
+source ~/.config/neomutt/lists
+source ~/.config/neomutt/aliases

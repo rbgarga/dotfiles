@@ -1,0 +1,107 @@
+# General settings, the same in every account
+
+# --- Mailboxes ------------------------------------------------------
+set folder = "~/Mail"
+set spool_file = "+personal/inbox"
+set virtual_spool_file = no
+set nm_default_url = "notmuch://$HOME/Mail"
+set nm_query_type = threads
+set nm_unread_tag = unread
+set nm_flagged_tag = flagged
+set nm_replied_tag = replied
+set mail_check = 60
+set mail_check_stats = yes
+set mail_check_stats_interval = 60
+set timeout = 30
+set header_cache = "~/.cache/neomutt/headers"
+set message_cache_dir = "~/.cache/neomutt/bodies"
+# Delete and Archive purge without asking; saving to an existing mailbox
+# does not ask either (see bindings and actions/)
+set delete = yes
+set confirm_append = no
+set mark_old = no
+set beep_new = no
+
+# --- Index ----------------------------------------------------------
+set use_threads = threads
+set sort = last-date
+set sort_aux = date
+set strict_threads = no
+set collapse_unread = no
+set uncollapse_jump = yes
+set index_format = "%4C %Z %{%Y-%m-%d} %-18.18L %?M?(%3M)&     ? %s"
+set date_format = "%Y-%m-%d %H:%M"
+set status_format = "-%r- %D [%?M?%M/?%m%?n? new:%n?%?u? unread:%u?%?F? flagged:%F?%?d? del:%d?]%?l? %l? -%>-(%P)---"
+set menu_scroll = yes
+set help = no
+set sleep_time = 0
+set wait_key = yes
+
+# --- Sidebar --------------------------------------------------------
+set sidebar_visible = yes
+set sidebar_width = 30
+set sidebar_sort = unsorted
+set sidebar_short_path = no
+set sidebar_folder_indent = no
+set sidebar_divider_char = "│"
+set sidebar_next_new_wrap = yes
+set sidebar_format = "%D%?F? [%F]?%* %?N?%N/?%?S?%S?"
+
+# --- Pager and MIME -------------------------------------------------
+set pager_index_lines = 10
+set pager_context = 3
+set pager_stop = yes
+set markers = no
+set smart_wrap = yes
+set tilde = yes
+set mailcap_path = "~/.config/neomutt/mailcap"
+alternative_order text/plain text/enriched text/html
+auto_view text/html
+set attach_save_dir = "~/Downloads"
+ignore *
+unignore from: to: cc: date: subject: reply-to: mail-followup-to: list-id: organization: user-agent: x-mailer:
+unhdr_order *
+hdr_order from: to: cc: reply-to: mail-followup-to: date: subject: list-id:
+
+# --- Composing ------------------------------------------------------
+set editor = "nvim -c 'setlocal filetype=mail textwidth=72 formatoptions+=t' '+/^$'"
+set edit_headers = yes
+set text_flowed = no
+set send_charset = "us-ascii:utf-8"
+set include = yes
+set fast_reply = yes
+set sig_dashes = yes
+set reverse_name = yes
+set reverse_real_name = no
+set forward_format = "Fwd: %s"
+set mime_forward = ask-no
+set abort_noattach = ask-yes
+set abort_noattach_regex = "\\<(attach(ed|ments?)?|anexo|anexado)\\>"
+set postpone = ask-yes
+set recall = ask-yes
+
+# --- Sending --------------------------------------------------------
+# msmtp picks the account by the envelope-from, which is always the From
+# of the message (see ~/.config/msmtp/config)
+set sendmail = "msmtp --read-envelope-from -t"
+set use_envelope_from = yes
+set use_from = yes
+# A reply to a list keeps the user in Mail-Followup-To (lists are known,
+# not subscribed, see lists)
+set followup_to = yes
+set honor_followup_to = yes
+
+# --- Contacts -------------------------------------------------------
+# Every sender notmuch has seen, plus the local aliases
+set query_command = "echo; notmuch address --deduplicate=address from:%s*"
+set alias_file = "~/.config/neomutt/aliases"
+
+# --- GPG ------------------------------------------------------------
+# Verify and decrypt; sign only on demand (compose: p)
+set crypt_use_gpgme = yes
+set crypt_auto_sign = no
+set crypt_reply_sign = no
+set crypt_reply_encrypt = yes
+set crypt_verify_sig = yes
+set crypt_opportunistic_encrypt = no
+set autocrypt = no

@@ -6,7 +6,8 @@
 # of its app password or `oauth2: true` (the token comes from
 # mail-oauth2, for accounts that allow no app password).  Labels keep
 # their Gmail names verbatim and are synced to ~/Mail/<account>/<label>;
-# groups go to ~/Mail/lists/<name>.
+# the labels also listed in `flat` are shown in neomutt without threads.
+# Groups go to ~/Mail/lists/<name>.
 mail:
   accounts:
     - name: personal
@@ -48,8 +49,12 @@ mail:
         - lists/tnsr-git
         - lists/tnsr-gitlab
         - lists/vpp-dev
+      # One notification per message, nothing to thread
+      flat:
+        - jenkins
 
-  # gmane group, list name (the local folder) and initial depth in days.
+  # gmane group, list name (the local folder) and initial depth in days;
+  # an optional title replaces the name in neomutt's sidebar.
   # The depth only applies to the first run of a group; older history
   # is fetched with `nntp-sync --backfill <name> <days>`.
   groups:
@@ -64,8 +69,8 @@ mail:
     - { group: gmane.os.freebsd.devel.ports, name: freebsd-ports, days: 730 }
     - { group: gmane.os.freebsd.devel.wireless, name: freebsd-wireless, days: 730 }
     # FreeBSD commit lists, high volume
-    - { group: gmane.os.freebsd.devel.cvs.ports, name: dev-commits-ports-all, days: 90 }
-    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, days: 90 }
+    - { group: gmane.os.freebsd.devel.cvs.ports, name: dev-commits-ports-all, title: commits-ports, days: 90 }
+    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, title: commits-src, days: 90 }
     # Other projects
     - { group: gmane.comp.version-control.git, name: git, days: 90 }
     - { group: gmane.comp.tools.sudo.announce, name: sudo-announce, days: 730 }

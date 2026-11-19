@@ -1,0 +1,14 @@
+# Personal: rbgarga@gmail.com, sent through smtp.gmail.com
+set my_account = personal
+set real_name = "Renato Botelho"
+set from = "rbgarga@gmail.com"
+# Recipient identity: reverse_name only picks among these
+unalternates *
+alternates "^rbgarga@gmail\\.com$"
+set signature = "~/.config/neomutt/signatures/personal"
+unmy_hdr Organization
+set postponed = "+personal/drafts"
+# Gmail saves the sent copy itself
+set my_record = ""
+set record = ""
+set my_reply_record = ""

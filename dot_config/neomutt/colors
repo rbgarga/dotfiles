@@ -1,0 +1,66 @@
+# Gruvbox dark.  The 16 ANSI colors come from the terminal palette
+# (Gruvbox in Ghostty), so they match it exactly; the gray backgrounds
+# and orange are the nearest 256-color entries.  The background is left
+# to the terminal.
+#
+# color8 gray  color9 red  color10 green  color11 yellow  color12 blue
+# color13 purple  color14 aqua  color15 fg  color7 fg4  color0 bg
+# color237 bg1  color239 bg2  color208 orange
+
+color normal          color15 default
+color error           color9 default
+color message         color15 default
+color prompt          color15 default
+color status          color15 color237
+color indicator       color0 color12
+color tree            color8 default
+color markers         color208 default
+color tilde           color239 default
+color search          color0 color11
+color attachment      color13 default
+color signature       color8 default
+color hdrdefault      color14 default
+color header          color11 default "^(From|Subject):"
+color header          color12 default "^(To|Cc|Reply-To|Mail-Followup-To):"
+color header          color8 default "^(Date|List-Id|Organization|User-Agent|X-Mailer):"
+
+color quoted          color12 default
+color quoted1         color14 default
+color quoted2         color13 default
+color quoted3         color11 default
+color quoted4         color208 default
+
+color body            color14 default "(https?|ftp)://[^ \t\">)]+"
+color body            color14 default "[-a-z_0-9.%$+]+@[-a-z_0-9.]+\\.[-a-z][-a-z]+"
+color body            color10 default "^gpg: Good signature.*"
+color body            color9 default "^gpg: (BAD|Can't check) signature.*"
+color body            color11 default "^\\[-- .* --\\]$"
+
+# Index: unread bold, flagged yellow, deleted red, replied to me aqua
+color index           color15 default "~A"
+color index_author    color15 default "~A"
+color index           bold color15 default "~U"
+color index_author    bold color11 default "~U"
+color index           color11 default "~F"
+color index           color9 default "~D"
+color index           color0 color239 "~T"
+color index_date      color8 default
+color index_number    color239 default
+color index_size      color8 default
+color index_flags     color208 default "~F"
+
+# Sidebar
+color sidebar_ordinary   color7 default
+color sidebar_divider    color239 default
+color sidebar_unread     bold color15 default
+color sidebar_new        bold color10 default
+color sidebar_flagged    color11 default
+color sidebar_highlight  color15 color237
+color sidebar_indicator  color0 color12
+
+# Compose
+color compose header             color14 default
+color compose security_sign      color10 default
+color compose security_encrypt   color12 default
+color compose security_both      color10 default
+color compose security_none      color8 default

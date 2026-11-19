@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# mail-label - Delete or unlabel, under one label, the message on stdin
+#
+# Usage: mail-label delete|unlabel <account>/<label>
+#
+#   delete   move the message's file under that label to the account's
+#            Trash; Gmail then trashes the message
+#   unlabel  remove the message's file under that label; Gmail then only
+#            removes the label
+#
+#   mail-label unlabel freebsd/freebsd/reviews < message
+#
+# Used by the neomutt label view macros (`<pipe-message>`).  A label view
+# is a notmuch query, so neomutt's own delete could remove whichever copy
+# of the message notmuch handed it, possibly the All Mail one, which
+# would delete it for good in Gmail.  This only ever touches the files of
+# that Message-ID under ~/Mail/<account>/<label>, and refuses when there
+# is none (e.g. the user's own reply shown in the thread).  mbsync
+# carries the change to Gmail on the next sync.
+
+set -eu
+
+die() {
+	echo "$(basename "$0"): $*" >&2
+	exit 1
+}
+
+usage() {
+	die "usage: $(basename "$0") delete|unlabel <account>/<label>"
+}
+
+[ $# -eq 2 ] || usage
+action=$1
+folder=$2
+
+case "${action}" in
+	delete|unlabel) ;;
+	*) usage ;;
+esac
+case "${folder}" in
+	*..*|*\"*) die "invalid label: ${folder}" ;;
+	personal/?*|freebsd/?*|work/?*) ;;
+	*) die "not a label view: ${folder}" ;;
+esac
+account=${folder%%/*}
+case "${folder#*/}" in
+	inbox|all|sent|drafts|trash|spam) die "not a label view: ${folder}" ;;
+esac
+
+# Message-ID of the piped message, from its (possibly folded) header
+mid=$(awk '
+	/^$/ { exit }
+	/^[ \t]/ { if (inmid) line = line $0; next }
+	{ if (inmid) exit; inmid = (tolower($0) ~ /^message-id:/); line = $0 }
+	END { if (inmid) print line }
+' | sed -n 's/^[^:]*:[[:space:]]*<\([^>]*\)>.*/\1/p')
+[ -n "${mid}" ] || die "message has no Message-ID"
+case "${mid}" in
+	*\"*) die "unsupported Message-ID: ${mid}" ;;
+esac
+
+root=$(notmuch config get database.path) || die "notmuch is not configured"
+dir=${root}/${folder}
+# notmuch prints every file of the message (All Mail, INBOX, the other
+# labels), so keep only the ones in this label's Maildir
+files=$(notmuch search --output=files "id:\"${mid}\"") \
+    || die "notmuch search failed"
+files=$(printf '%s\n' "${files}" | awk -v cur="${dir}/cur/" \
+    -v new="${dir}/new/" 'index($0, cur) == 1 || index($0, new) == 1')
+[ -n "${files}" ] || die "message is not under ${folder}"
+
+trash=${root}/${account}/trash
+[ "${action}" = unlabel ] || [ -d "${trash}/cur" ] \
+    || die "no Trash Maildir (${trash})"
+
+printf '%s\n' "${files}" | while IFS= read -r file; do
+	if [ "${action}" = delete ]; then
+		# Drop mbsync's UID from the name, it belongs to the old folder
+		name=$(basename "${file}" | sed 's/,U=[0-9]*//')
+		sub=$(basename "$(dirname "${file}")")
+		mv "${file}" "${trash}/${sub}/${name}"
+	else
+		rm "${file}"
+	fi
+done
+
+notmuch new --quiet

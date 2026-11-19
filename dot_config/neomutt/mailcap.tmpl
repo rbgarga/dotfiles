@@ -1,0 +1,9 @@
+{{- $open := "xdg-open" }}{{ if eq .chezmoi.os "darwin" }}{{ $open = "open" }}{{ end -}}
+# mailcap for neomutt: HTML is shown inline with w3m (auto_view), and
+# every type opens in the default app with V / view-mailcap.  The file is
+# copied first since neomutt removes it as soon as the command returns,
+# before the app has read it.
+
+text/html; d=$(mktemp -d -t neomutt.XXXXXX) && cp %s "$d/message.html" && {{ $open }} "$d/message.html"; nametemplate=%s.html
+text/html; w3m -I %{charset} -T text/html -dump -o display_link_number=1; copiousoutput
+*/*; d=$(mktemp -d -t neomutt.XXXXXX) && cp %s "$d/" && {{ $open }} "$d/$(basename %s)"

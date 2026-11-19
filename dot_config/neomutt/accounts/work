@@ -1,0 +1,15 @@
+# Work: renato@netgate.com (default) and garga@netgate.com, sent through
+# smtp.gmail.com
+set my_account = work
+set real_name = "Renato Botelho do Couto"
+set from = "renato@netgate.com"
+# Recipient identity: reverse_name only picks among these
+unalternates *
+alternates "^(renato|garga)@netgate\\.com$"
+set signature = "~/.config/neomutt/signatures/work"
+my_hdr Organization: Netgate
+set postponed = "+work/drafts"
+# Gmail saves the sent copy itself
+set my_record = ""
+set record = ""
+set my_reply_record = ""

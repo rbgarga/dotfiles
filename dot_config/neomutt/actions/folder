@@ -1,0 +1,3 @@
+# Sent and Drafts (real Maildirs): Delete moves the message to the
+# account's Trash.  Needs $my_account from accounts/.
+macro index,pager d "<save-message>+$my_account/trash<enter>" "Delete: move to Trash"

@@ -1,0 +1,8 @@
+# Message actions anywhere not covered by the files below: Flagged,
+# searches, and the Maildirs that are not in the sidebar (All Mail, Trash,
+# Spam).  neomutt's own delete is never bound to d, because removing a
+# file from All Mail would delete the message for good in Gmail.
+macro index,pager d "<enter-command>echo 'Delete: open the message from INBOX or a label'<enter>" "Delete (not here)"
+macro index,pager y "<enter-command>echo 'Archive: only in INBOX'<enter>" "Archive (not here)"
+macro index,pager ,u "<enter-command>echo 'Unlabel: only in a label view'<enter>" "Unlabel (not here)"
+bind index,pager r reply

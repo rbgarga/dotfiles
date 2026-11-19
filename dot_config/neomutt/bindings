@@ -1,0 +1,49 @@
+# Key bindings: vim-ish movement and the message actions of docs/mail/
+#
+# Overridden defaults: g (group-reply, now R), G (fetch-mail), y
+# (browse-mailboxes), R (recall-message, offered by m anyway), ^D and ^U
+# (thread delete/undelete), ^K (extract-keys).
+#
+# d (Delete), y (Archive) and ,u (Unlabel) depend on the mailbox, so they
+# are (re)defined by the folder-hooks in actions/.
+
+# --- Movement -------------------------------------------------------
+bind index,pager g noop
+bind index gg first-entry
+bind index G last-entry
+bind pager gg top
+bind pager G bottom
+bind index,pager \Cd half-down
+bind index,pager \Cu half-up
+
+# --- Sidebar --------------------------------------------------------
+bind index,pager \Cj sidebar-next
+bind index,pager \Ck sidebar-prev
+bind index,pager \Co sidebar-open
+bind index,pager B sidebar-toggle-visible
+# Next / previous mailbox with unread mail, opened right away (wraps
+# around, see sidebar_next_new_wrap)
+macro index,pager ,n "<sidebar-next-new><sidebar-open>" "Open the next mailbox with unread mail"
+macro index,pager ,p "<sidebar-prev-new><sidebar-open>" "Open the previous mailbox with unread mail"
+
+# --- Replying -------------------------------------------------------
+bind index,pager R group-reply
+bind index,pager L list-reply
+
+# --- Search ---------------------------------------------------------
+# Full-text search over every account and the lists (notmuch syntax)
+bind index \\ vfolder-from-query
+
+# --- Sync -----------------------------------------------------------
+# wait_key is only off for the sync itself: a failure still waits
+macro index,pager S "<enter-command>set wait_key=no<enter><shell-escape>mail-sync<enter><enter-command>set wait_key=yes<enter><check-stats>" "Sync all accounts and lists now"
+
+# --- HTML and links -------------------------------------------------
+# V opens the HTML part in the browser (mailcap), ^B picks a link
+macro index,pager V "<view-attachments><search>html<enter><view-mailcap><exit>" "Open the HTML part in the browser"
+macro attach V "<view-mailcap>" "Open in the browser / default app"
+macro index,pager \Cb "<pipe-message>urlscan<enter>" "Pick a link with urlscan"
+macro attach,compose \Cb "<pipe-entry>urlscan<enter>" "Pick a link with urlscan"
+
+# --- Composing ------------------------------------------------------
+bind editor <Tab> complete-query

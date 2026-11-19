@@ -1,0 +1,16 @@
+# Mailing lists
+#
+# Known lists (`lists`, not `subscribe`): read from the gmane mirror, not
+# subscribed, so a list reply sets a Mail-Followup-To that keeps the user
+# in, and replies from others still reach the user directly.
+
+lists "^freebsd-[a-z0-9-]+@freebsd\\.org$"
+lists "^dev-commits-[a-z0-9-]+@freebsd\\.org$"
+lists "^(git|linux-kernel-announce)@vger\\.kernel\\.org$"
+lists "^sudo-(announce|workers)@sudo\\.ws$"
+lists "^curl-announce@lists\\.haxx\\.se$"
+lists "^ubuntu-announce@lists\\.ubuntu\\.com$"
+
+# List views: always the FreeBSD identity and its Sent record (no reply
+# copy), and r replies to the list and the author (group-reply)
+folder-hook '(folder|path):lists/' 'source ~/.config/neomutt/accounts/freebsd; source ~/.config/neomutt/actions/list'

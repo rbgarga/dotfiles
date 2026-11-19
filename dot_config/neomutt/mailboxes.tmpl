@@ -1,0 +1,45 @@
+# Sidebar mailboxes and their folder-hooks, rendered from
+# .chezmoidata/mail.yaml.  The sidebar keeps the order below.
+#
+# INBOX, Sent and Drafts are the real Maildirs; label and list views are
+# notmuch queries, so they also show the user's replies in each thread.
+# folder-hooks match the Maildir path or the notmuch URL, and run in the
+# order they are defined: defaults, then the account, then the mailbox.
+
+# --- Reply copy -----------------------------------------------------
+# A reply is also saved where its original was read from: the mailbox
+# hooks set my_reply_record (the account's record plus that Maildir, in
+# neomutt's comma-separated multiple Fcc).  reply-hook runs before
+# send-hook, and a new message (not a reply, ~Q) gets the plain record.
+reply-hook . 'set record="$my_reply_record"'
+send-hook '!~Q' 'set record="$my_record"'
+
+# --- Defaults: Personal account, no destructive actions, threads ----
+folder-hook . 'set use_threads=threads; source ~/.config/neomutt/accounts/personal; source ~/.config/neomutt/actions/default'
+
+virtual-mailboxes "Flagged" "notmuch://?query=tag:flagged&type=messages"
+{{- range .mail.accounts }}
+{{- $a := .name }}
+{{- $flat := get . "flat" | default list }}
+{{- $rec := "" }}{{ if get . "sent_copy" }}{{ $rec = printf "+%s/sent," $a }}{{ end }}
+
+# --- {{ .title }} {{ repeat (sub 63 (len .title) | int) "-" }}
+folder-hook '/Mail/{{ $a }}/|folder:{{ $a }}/' 'source ~/.config/neomutt/accounts/{{ $a }}'
+
+named-mailboxes "{{ .title }}" "+{{ $a }}/inbox"
+folder-hook '/Mail/{{ $a }}/inbox/?$' 'set my_reply_record="{{ $rec }}+{{ $a }}/inbox"; source ~/.config/neomutt/actions/inbox'
+{{- range .labels }}
+
+virtual-mailboxes "  {{ . }}" "notmuch://?query=folder:{{ $a }}/{{ . }}"
+folder-hook 'folder:{{ regexQuoteMeta (printf "%s/%s" $a .) }}$' 'set my_label="{{ $a }}/{{ . }}" my_reply_record="{{ $rec }}+{{ $a }}/{{ . }}"; source ~/.config/neomutt/actions/label{{ if has . $flat }}; set use_threads=flat{{ end }}'
+{{- end }}
+
+named-mailboxes "  Sent" "+{{ $a }}/sent" "  Drafts" "+{{ $a }}/drafts"
+folder-hook '/Mail/{{ $a }}/(sent|drafts)/?$' 'source ~/.config/neomutt/actions/folder'
+{{- end }}
+
+# --- Lists (hooks in lists) -----------------------------------------
+virtual-mailboxes "Lists" "notmuch://?query=path:lists/**"
+{{- range .mail.groups }}
+virtual-mailboxes "  {{ get . "title" | default .name }}" "notmuch://?query=folder:lists/{{ .name }}"
+{{- end }}

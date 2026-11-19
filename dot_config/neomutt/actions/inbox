@@ -1,0 +1,5 @@
+# INBOX (a real Maildir): Delete moves the message to the account's
+# Trash, Archive removes it from INBOX only (Gmail keeps it in All Mail
+# and its labels).  Needs $my_account from accounts/.
+macro index,pager d "<save-message>+$my_account/trash<enter>" "Delete: move to Trash"
+bind index,pager y delete-message

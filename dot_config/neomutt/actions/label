@@ -1,0 +1,5 @@
+# Label views (notmuch queries): Delete and Unlabel go through mail-label,
+# which only touches the message's file under this label, never the All
+# Mail copy.  Needs $my_label (<account>/<label>) from the folder-hook.
+macro index,pager d "<enter-command>set wait_key=no<enter><pipe-message>mail-label delete '$my_label'<enter><enter-command>set wait_key=yes<enter>" "Delete: move to Trash"
+macro index,pager ,u "<enter-command>set wait_key=no<enter><pipe-message>mail-label unlabel '$my_label'<enter><enter-command>set wait_key=yes<enter>" "Unlabel: remove from this label"
