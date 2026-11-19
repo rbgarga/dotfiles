@@ -17,6 +17,7 @@ jq
 bash
 {{ if .desktop -}}
 neomutt
+kitty
 isync
 msmtp
 notmuch

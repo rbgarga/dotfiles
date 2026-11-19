@@ -42,6 +42,8 @@ docs
 
 {{ if ne .chezmoi.os "darwin" }}
 Library
+.config/kitty
+.local/share/raycast
 {{ end }}
 
 # Mail (neomutt, mbsync, msmtp, notmuch, nntp-sync): desktops only
@@ -56,5 +58,7 @@ Library
 .local/bin/mail-secret
 .local/bin/mail-sync
 .local/bin/nntp-sync
+.config/kitty
+.local/share/raycast/neomutt.sh
 Library/LaunchAgents/org.rbgarga.mail-sync.plist
 {{ end }}

@@ -1,0 +1,2 @@
+# kitty's startup session (see kitty.conf)
+launch zsh -lic "exec neomutt"
