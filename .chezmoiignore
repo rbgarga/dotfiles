@@ -1,6 +1,7 @@
 README.md
 .DS_Store
 pkg_list
+docs
 
 {{ if eq .chezmoi.os "darwin" }}
 .ssh/config

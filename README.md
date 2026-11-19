@@ -174,4 +174,9 @@ API rate limits). After an intentional `:Lazy sync` in nvim, run
   config reload, and FreeBSD desktop system tweaks (polkit rules and the
   poudriere nginx config, templated with each host's FQDN and gated on the
   `poudriere` flag)
+- Mail — neomutt over local Maildirs (mbsync, notmuch, msmtp, gmane
+  lists mirrored by `nntp-sync`), desktops only. Accounts, labels and
+  lists are in `.chezmoidata/mail.yaml`; the runbook (secrets, Gmail
+  settings, first sync) is `docs/mail/README.md`, with the glossary and
+  ADRs next to it
 - `pkg_list` — reference file, not installed
