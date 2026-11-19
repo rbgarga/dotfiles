@@ -1,0 +1,45 @@
+# msmtp - one account per mail account, picked by envelope-from
+#
+# neomutt sends with `msmtp --read-envelope-from -t` and sets the
+# envelope-from to the identity's address, so the account whose `from`
+# matches it is used.  Passwords come from mail-secret, OAuth2 tokens
+# from mail-oauth2.  Test an account with `msmtp -a <account>
+# --serverinfo`.
+
+defaults
+auth on
+tls on
+tls_trust_file system
+logfile ~/.cache/msmtp.log
+
+# Gmail saves a copy in Sent Mail itself
+account personal
+host smtp.gmail.com
+port 465
+tls_starttls off
+from rbgarga@gmail.com
+user rbgarga@gmail.com
+passwordeval "mail-secret personal"
+
+# The garga/mail principal only sends; nothing is saved server side, so
+# neomutt records a copy in ~/Mail/freebsd/sent
+account freebsd
+host smtp.FreeBSD.org
+port 587
+tls_starttls on
+from garga@FreeBSD.org
+user garga/mail
+passwordeval "mail-secret freebsd-smtp"
+
+# Both identities (renato@ and garga@) go through the same login, with an
+# OAuth2 token since Netgate allows no app passwords
+account work
+host smtp.gmail.com
+port 465
+tls_starttls off
+from *@netgate.com
+user garga@netgate.com
+auth xoauth2
+passwordeval "mail-oauth2 work"
+
+account default : personal

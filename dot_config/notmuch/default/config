@@ -1,0 +1,20 @@
+# notmuch - indexes everything under ~/Mail (accounts and lists)
+#
+# Run by mail-sync after mbsync and nntp-sync.  Read state and Flagged
+# are kept in sync with the Maildir flags, so they reach Gmail through
+# mbsync and are shared between the copies of a message.
+
+[database]
+path=Mail
+
+[user]
+name=Renato Botelho
+primary_email=rbgarga@gmail.com
+other_email=garga@FreeBSD.org;renato@netgate.com;garga@netgate.com;garga.bsd@gmail.com
+
+[new]
+tags=unread;
+ignore=.mbsyncstate;.mbsyncstate.journal;.mbsyncstate.new;.mbsyncstate.lock;.uidvalidity;.isyncuidmap.db;.metadata_never_index
+
+[maildir]
+synchronize_flags=true

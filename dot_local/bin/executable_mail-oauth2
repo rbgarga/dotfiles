@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+#
+# mail-oauth2 - Print a Gmail OAuth2 access token for mbsync and msmtp
+#
+# Usage: mail-oauth2 [--authorize] work
+#
+#   --authorize  open Google's consent page in the browser and store the
+#                refresh token it grants; needed once, and again whenever
+#                Google revokes the token
+#
+# Used as PassCmd in ~/.mbsyncrc and passwordeval in ~/.config/msmtp/config
+# for the accounts that log in with OAuth2 (XOAUTH2) instead of an app
+# password.  The OAuth2 client ("<id> <secret>") and the refresh token are
+# read and stored with mail-secret, as <account>-oauth-client and
+# <account>-oauth-refresh.  The access token is cached, until shortly
+# before it expires, in ~/.cache/mail-oauth2/<account>.
+#
+# Environment:
+#   XDG_CACHE_HOME  Base of the token cache (default: ~/.cache)
+
+import argparse
+import base64
+import hashlib
+import http.server
+import json
+import os
+import secrets
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+ACCOUNTS = ("work",)
+AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+SCOPE = "https://mail.google.com/"
+# A token this close to expiring is refreshed instead of used
+MARGIN = 300
+
+prog = os.path.basename(sys.argv[0])
+
+
+def die(msg):
+    print(f"{prog}: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def secret(name):
+    try:
+        return subprocess.run(["mail-secret", name], check=True,
+                              capture_output=True, text=True).stdout.strip()
+    except subprocess.CalledProcessError as e:
+        die(e.stderr.strip() or f"mail-secret {name} failed")
+
+
+def store_secret(name, value):
+    try:
+        subprocess.run(["mail-secret", "-w", name], input=value + "\n",
+                       check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        die(e.stderr.strip() or f"mail-secret -w {name} failed")
+
+
+def client(account):
+    fields = secret(f"{account}-oauth-client").split()
+    if len(fields) != 2:
+        die(f"{account}-oauth-client must be \"<client id> <client secret>\"")
+    return fields
+
+
+def token_request(params):
+    data = urllib.parse.urlencode(params).encode()
+    try:
+        with urllib.request.urlopen(TOKEN_URL, data, timeout=30) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.load(e)
+        except ValueError:
+            err = {}
+        return {"error": err.get("error", f"HTTP {e.code}"),
+                "error_description": err.get("error_description", "")}
+    except (urllib.error.URLError, OSError) as e:
+        die(f"unable to reach {TOKEN_URL}: {e}")
+
+
+def cache_path(account):
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    return os.path.join(base, "mail-oauth2", account)
+
+
+def cache_read(account):
+    try:
+        with open(cache_path(account)) as f:
+            c = json.load(f)
+        if c["expires"] - MARGIN > time.time():
+            return c["access_token"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def cache_write(account, response):
+    path = cache_path(account)
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    # Written aside and renamed, so a concurrent reader (mbsync and msmtp
+    # can both ask) never sees half a file
+    tmp = f"{path}.{os.getpid()}"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"access_token": response["access_token"],
+                   "expires": time.time() + int(response["expires_in"])}, f)
+    os.replace(tmp, path)
+
+
+def check(response, what):
+    if "error" in response:
+        desc = response.get("error_description")
+        die(f"{what} failed: {response['error']}" + (f" ({desc})" if desc else ""))
+    if "access_token" not in response:
+        die(f"{what} failed: no access token in the response")
+
+
+def refresh(account):
+    client_id, client_secret = client(account)
+    response = token_request({
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": secret(f"{account}-oauth-refresh"),
+        "grant_type": "refresh_token",
+    })
+    if response.get("error") == "invalid_grant":
+        die(f"Google rejected the refresh token of {account}; "
+            f"run: {prog} --authorize {account}")
+    check(response, "token refresh")
+    cache_write(account, response)
+    # Google does not normally rotate refresh tokens, but may
+    if "refresh_token" in response:
+        store_secret(f"{account}-oauth-refresh", response["refresh_token"])
+    return response["access_token"]
+
+
+def authorize(account):
+    client_id, client_secret = client(account)
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = secrets.token_urlsafe(16)
+    query = {}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            if q.get("state") != [state]:
+                self.send_error(400)
+                return
+            query.update({k: v[0] for k, v in q.items()})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"mail-oauth2: done, this tab can be closed.\n")
+
+        def log_message(self, *args):
+            pass
+
+    # Google accepts any port on a loopback redirect for desktop clients
+    with http.server.HTTPServer(("127.0.0.1", 0), Handler) as httpd:
+        redirect = f"http://localhost:{httpd.server_address[1]}/"
+        url = AUTH_URL + "?" + urllib.parse.urlencode({
+            "client_id": client_id,
+            "redirect_uri": redirect,
+            "response_type": "code",
+            "scope": SCOPE,
+            "access_type": "offline",
+            "prompt": "consent",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": state,
+        })
+        print(f"Log into the {account} account in the browser; if it did "
+              f"not open, go to:\n\n{url}\n", file=sys.stderr)
+        opener = shutil.which("open") or shutil.which("xdg-open")
+        if opener:
+            subprocess.run([opener, url], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+        while not query:
+            httpd.handle_request()
+
+    if "code" not in query:
+        die(f"authorization failed: {query.get('error', 'no code returned')}")
+    response = token_request({
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": query["code"],
+        "code_verifier": verifier,
+        "redirect_uri": redirect,
+        "grant_type": "authorization_code",
+    })
+    check(response, "authorization")
+    if "refresh_token" not in response:
+        die("authorization failed: Google granted no refresh token")
+    store_secret(f"{account}-oauth-refresh", response["refresh_token"])
+    cache_write(account, response)
+    print(f"Refresh token stored as {account}-oauth-refresh", file=sys.stderr)
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        prog=prog, description="Print a Gmail OAuth2 access token.")
+    ap.add_argument("--authorize", action="store_true",
+                    help="get and store a new refresh token")
+    ap.add_argument("account", choices=ACCOUNTS)
+    args = ap.parse_args()
+
+    if args.authorize:
+        authorize(args.account)
+    else:
+        print(cache_read(args.account) or refresh(args.account))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,75 @@
+# Mail accounts, labels and mirrored lists (see docs/mail/)
+#
+# Rendered into ~/.mbsyncrc, ~/.config/nntp-sync/groups and the neomutt
+# mailboxes and hooks, so a label or a group is added in one place.
+# Each account has its IMAP login address and either the mail-secret name
+# of its app password or `oauth2: true` (the token comes from
+# mail-oauth2, for accounts that allow no app password).  Labels keep
+# their Gmail names verbatim and are synced to ~/Mail/<account>/<label>;
+# groups go to ~/Mail/lists/<name>.
+mail:
+  accounts:
+    - name: personal
+      title: Personal
+      login: rbgarga@gmail.com
+      secret: personal
+      labels:
+        - Servers/Galle
+    - name: freebsd
+      title: FreeBSD
+      login: garga.bsd@gmail.com
+      secret: freebsd-gmail
+      # Sent through smtp.FreeBSD.org, which keeps no copy in Gmail:
+      # neomutt records sent mail in ~/Mail/freebsd/sent
+      sent_copy: true
+      labels:
+        - freebsd/MFC
+        - freebsd/bugs
+        - freebsd/developers
+        - freebsd/git
+        - freebsd/ports-developers
+        - freebsd/reviews
+        - git/announce
+        - git/security
+        - github
+        - sudo/workers
+    - name: work
+      title: Work
+      login: garga@netgate.com
+      # Netgate's Workspace allows no app passwords
+      oauth2: true
+      labels:
+        - gitlab
+        - jenkins
+        - redmine
+        - lists/ng-eng-staff
+        - lists/pfsense-gitlab
+        - lists/tnsr-dev
+        - lists/tnsr-git
+        - lists/tnsr-gitlab
+        - lists/vpp-dev
+
+  # gmane group, list name (the local folder) and initial depth in days.
+  # The depth only applies to the first run of a group; older history
+  # is fetched with `nntp-sync --backfill <name> <days>`.
+  groups:
+    # FreeBSD discussion and announcements
+    - { group: gmane.os.freebsd.announce, name: freebsd-announce, days: 730 }
+    - { group: gmane.os.freebsd.architechture, name: freebsd-arch, days: 730 }
+    - { group: gmane.os.freebsd.current, name: freebsd-current, days: 730 }
+    - { group: gmane.os.freebsd.stable, name: freebsd-stable, days: 730 }
+    - { group: gmane.os.freebsd.devel.acpi, name: freebsd-acpi, days: 730 }
+    - { group: gmane.os.freebsd.devel.hackers, name: freebsd-hackers, days: 730 }
+    - { group: gmane.os.freebsd.devel.pkgbase, name: freebsd-pkgbase, days: 730 }
+    - { group: gmane.os.freebsd.devel.ports, name: freebsd-ports, days: 730 }
+    - { group: gmane.os.freebsd.devel.wireless, name: freebsd-wireless, days: 730 }
+    # FreeBSD commit lists, high volume
+    - { group: gmane.os.freebsd.devel.cvs.ports, name: dev-commits-ports-all, days: 90 }
+    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, days: 90 }
+    # Other projects
+    - { group: gmane.comp.version-control.git, name: git, days: 90 }
+    - { group: gmane.comp.tools.sudo.announce, name: sudo-announce, days: 730 }
+    - { group: gmane.comp.tools.sudo.devel, name: sudo-workers, days: 730 }
+    - { group: gmane.comp.web.curl.announce, name: curl-announce, days: 730 }
+    - { group: gmane.linux.kernel.announce, name: linux-kernel-announce, days: 730 }
+    - { group: gmane.linux.ubuntu.announce, name: ubuntu-announce, days: 730 }

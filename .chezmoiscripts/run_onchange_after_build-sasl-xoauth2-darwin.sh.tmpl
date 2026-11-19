@@ -1,0 +1,33 @@
+{{- if and (eq .chezmoi.os "darwin") .desktop -}}
+#!/bin/sh
+# Build the XOAUTH2 SASL plugin that mbsync needs to log into Work with
+# OAuth2.  Homebrew's isync uses the system libsasl2, which has no
+# XOAUTH2, and its plugin directory is read-only, so the plugin goes to
+# ~/.local/lib/sasl2 and mail-sync points SASL_PATH there.  Rebuilt when
+# the pinned commit below changes.
+set -e
+
+commit=36aabca54fd65c8fa7a707cb4936751599967904
+sha256=07d7a77c7c27f83923b830cbdd415602d680e85f4b8a2bdaf616322aea11b8dd
+dest=$HOME/.local/lib/sasl2
+
+work=$(mktemp -d)
+trap 'rm -rf "${work}"' EXIT
+
+curl -fsSL -o "${work}/src.tar.gz" \
+    "https://github.com/moriyoshi/cyrus-sasl-xoauth2/archive/${commit}.tar.gz"
+echo "${sha256}  ${work}/src.tar.gz" | shasum -a 256 -c -s
+tar -xzf "${work}/src.tar.gz" -C "${work}"
+
+# The sources include the autoconf config.h, which defines nothing they
+# use; their warnings (deprecated SASL API, unused variables) are silenced
+src=${work}/cyrus-sasl-xoauth2-${commit}
+: > "${src}/config.h"
+cc -O2 -bundle -w -I"${src}" \
+    -o "${work}/libxoauth2.so" \
+    "${src}"/xoauth2_str.c "${src}"/xoauth2_init.c \
+    "${src}"/xoauth2_server.c "${src}"/xoauth2_client.c -lsasl2
+
+mkdir -p "${dest}"
+mv "${work}/libxoauth2.so" "${dest}/libxoauth2.so"
+{{- end -}}

@@ -1,0 +1,10 @@
+{{- if .desktop -}}
+#!/bin/sh
+# Create each account's Maildir root, which mbsync needs to exist (it only
+# creates the folders below it); rerun when an account is added to
+# .chezmoidata/mail.yaml.
+set -e
+{{ range .mail.accounts }}
+mkdir -p "$HOME/Mail/{{ .name }}"
+{{- end }}
+{{- end -}}

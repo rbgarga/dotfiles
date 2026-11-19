@@ -1,0 +1,69 @@
+# mbsync (isync) - Gmail accounts synced to ~/Mail/<account>
+#
+# Run through mail-sync, which also mirrors the lists and runs notmuch
+# new.  `mbsync <account>` syncs one account, `mbsync --list <account>`
+# lists its remote folders.  See docs/mail/ in the dotfiles repo.
+#
+# Gmail specials get short local names (inbox, all, sent, drafts, trash,
+# spam); labels keep their Gmail names verbatim.  The accounts and labels
+# come from .chezmoidata/mail.yaml.  Passwords come from mail-secret, and
+# OAuth2 tokens from mail-oauth2; on macOS, XOAUTH2 needs SASL_PATH set to
+# ~/.local/lib/sasl2 (mail-sync does it).
+# Mail sent from FreeBSD goes through smtp.FreeBSD.org, which keeps no
+# copy in Gmail, so neomutt records it in ~/Mail/freebsd/sent and the
+# sent channel uploads it.
+
+Create Near
+Expunge Both
+SyncState *
+CopyArrivalDate yes
+{{- range .mail.accounts }}
+{{- $a := .name }}
+
+# --- {{ .title }} ({{ .login }}) {{ repeat (sub 60 (len (printf "%s (%s)" .title .login)) | int) "-" }}
+
+IMAPAccount {{ $a }}
+Host imap.gmail.com
+User {{ .login }}
+TLSType IMAPS
+{{- if get . "oauth2" }}
+PassCmd "mail-oauth2 {{ $a }}"
+AuthMechs XOAUTH2
+{{- else }}
+PassCmd "mail-secret {{ .secret }}"
+AuthMechs LOGIN
+{{- end }}
+
+IMAPStore {{ $a }}-remote
+Account {{ $a }}
+
+MaildirStore {{ $a }}-local
+Path ~/Mail/{{ $a }}/
+SubFolders Verbatim
+{{- $specials := list
+      (list "inbox" "INBOX")
+      (list "all" "[Gmail]/All Mail")
+      (list "sent" "[Gmail]/Sent Mail")
+      (list "drafts" "[Gmail]/Drafts")
+      (list "trash" "[Gmail]/Trash")
+      (list "spam" "[Gmail]/Spam") }}
+{{- range $specials }}
+
+Channel {{ $a }}-{{ index . 0 }}
+Far ":{{ $a }}-remote:{{ index . 1 }}"
+Near :{{ $a }}-local:{{ index . 0 }}
+{{- end }}
+
+Channel {{ $a }}-labels
+Far :{{ $a }}-remote:
+Near :{{ $a }}-local:
+{{- range .labels }}
+Patterns "{{ . }}"
+{{- end }}
+
+Group {{ $a }}
+{{- range $specials }}
+Channel {{ $a }}-{{ index . 0 }}
+{{- end }}
+Channel {{ $a }}-labels
+{{- end }}
