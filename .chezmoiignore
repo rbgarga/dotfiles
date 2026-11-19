@@ -39,3 +39,22 @@ docs
 .omp
 .local/bin/redmine-get
 {{ end }}
+
+{{ if ne .chezmoi.os "darwin" }}
+Library
+{{ end }}
+
+# Mail (neomutt, mbsync, msmtp, notmuch, nntp-sync): desktops only
+{{ if not (default false .desktop) }}
+.mbsyncrc
+.config/neomutt
+.config/msmtp
+.config/notmuch
+.config/nntp-sync
+.local/bin/mail-label
+.local/bin/mail-oauth2
+.local/bin/mail-secret
+.local/bin/mail-sync
+.local/bin/nntp-sync
+Library/LaunchAgents/org.rbgarga.mail-sync.plist
+{{ end }}
