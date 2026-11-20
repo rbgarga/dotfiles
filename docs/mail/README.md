@@ -179,6 +179,8 @@ then the Lists.
 | `^d` / `^u` | half page down / up |
 | `^j` / `^k` / `^o` | sidebar next / previous / open |
 | `B` | toggle the sidebar |
+| `,n` / `,p` | open the next / previous mailbox with unread mail |
+| `,r` | mark every message of the mailbox read |
 | `d` | Delete: move to Trash (INBOX, Sent, Drafts, label views) |
 | `y` | Archive: remove from INBOX (INBOX only) |
 | `,u` | Unlabel: remove the label (label views only) |

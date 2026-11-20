@@ -26,6 +26,11 @@ bind index,pager B sidebar-toggle-visible
 macro index,pager ,n "<sidebar-next-new><sidebar-open>" "Open the next mailbox with unread mail"
 macro index,pager ,p "<sidebar-prev-new><sidebar-open>" "Open the previous mailbox with unread mail"
 
+# --- Reading --------------------------------------------------------
+# Mark every unread message of the mailbox read (only the shown ones
+# when a limit is on)
+macro index ,r "<tag-pattern>~U<enter><tag-prefix><clear-flag>N<untag-pattern>~T<enter>" "Mark all messages read"
+
 # --- Replying -------------------------------------------------------
 bind index,pager R group-reply
 bind index,pager L list-reply
