@@ -155,13 +155,16 @@ nntp-sync -v
 
 Logs: `~/Library/Logs/mail-sync.log` on macOS,
 `~/.local/state/mail-sync.log` elsewhere. Only output and failures are
-logged; past 1 MB the log is moved to `mail-sync.log.0`. The agent is checked with
+logged; past 1 MB the log is moved to `mail-sync.log.0`. The agent is
+checked with
 `launchctl print gui/$(id -u)/org.rbgarga.mail-sync`.
 
-Older list history, beyond the initial depth in `mail.yaml`:
+Each list keeps the days of history set in `mail.yaml`: `mail-sync`
+removes the messages that grow older, except the flagged ones. After
+raising a list's days, fetch its older history with:
 
 ```sh
-nntp-sync -v --backfill freebsd-current 1460
+nntp-sync -v --backfill freebsd-current 720
 ```
 
 ## 6. Using neomutt

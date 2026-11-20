@@ -1,7 +1,7 @@
 # gmane groups mirrored by nntp-sync into ~/Mail/lists/<short name>,
 # rendered from .chezmoidata/mail.yaml
 #
-# <gmane group> <short name> <initial depth in days>
+# <gmane group> <short name> <days of history kept>
 {{ range .mail.groups -}}
 {{ printf "%-34s %-22s %d" .group .name (int .days) }}
 {{ end -}}

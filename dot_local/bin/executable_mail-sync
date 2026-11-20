@@ -7,10 +7,12 @@
 #   -s  scheduled run: do nothing until the first sync, done by hand, has
 #       created the notmuch database (~/Mail/.notmuch)
 #
-# Runs `mbsync -a` (or only the given account), then nntp-sync (only
-# when syncing every account), then `notmuch new`.  Every step runs even
-# when an earlier one fails, so one broken account does not stop the
-# others from being indexed; the exit status is 1 when any step failed.
+# Runs `mbsync -a` (or only the given account), then nntp-sync and the
+# removal of the list messages older than the days their group keeps
+# (only when syncing every account), then `notmuch new`.  Every step
+# runs even when an earlier one fails, so one broken account does not
+# stop the others from being indexed; the exit status is 1 when any
+# step failed.
 #
 # Run every 5 minutes by launchd on macOS (org.rbgarga.mail-sync, with -s)
 # and on demand from neomutt.  A second run while one is in progress
@@ -96,12 +98,35 @@ run() {
 	fi
 }
 
+# Remove the messages of each list older than the days of history its
+# group keeps (the third column of nntp-sync's groups file), except the
+# flagged ones.  notmuch names every file of a message, also its copies
+# in Gmail or in another list, so only the list's own files go.
+# shellcheck disable=SC2329 # called through run
+prune_lists() {
+	conf=${XDG_CONFIG_HOME:-${HOME}/.config}
+	groups=${NNTP_SYNC_GROUPS:-${conf}/nntp-sync/groups}
+	lists=${HOME}/Mail/lists
+	[ -f "${groups}" ] || return 0
+	grep -v -e '^#' -e '^[[:space:]]*$' "${groups}" |
+	while read -r _ name days; do
+		n=$(notmuch search --output=files \
+		    "folder:lists/${name} and date:..${days}d and not tag:flagged" |
+		    grep -F "${lists}/${name}/" | tee "${state}/prune" | wc -l)
+		[ "${n}" -eq 0 ] && continue
+		tr '\n' '\0' < "${state}/prune" | xargs -0 rm -f &&
+		    echo "${name}: ${n} older than ${days} days removed"
+	done
+	rm -f "${state}/prune"
+}
+
 {
 	if [ -n "${account}" ]; then
 		run mbsync -q "${account}"
 	else
 		run mbsync -q -a
 		run nntp-sync
+		run prune_lists
 	fi
 	run notmuch new --quiet
 } >> "${log}"

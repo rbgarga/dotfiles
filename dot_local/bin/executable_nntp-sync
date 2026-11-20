@@ -12,9 +12,11 @@
 #               older than the oldest one already mirrored, marked read
 #
 # The groups are listed in ~/.config/nntp-sync/groups, one per line:
-#   <gmane group> <short name> <initial depth in days>
+#   <gmane group> <short name> <days of history kept>
 # and each is mirrored into ~/Mail/lists/<short name>, where notmuch
-# indexes it.  The first run of a group fetches the last <depth> days,
+# indexes it (mail-sync removes what grows older than <days>, and an
+# article removed is not fetched again).  The first run of a group
+# fetches the last <days> days,
 # found by a binary search on the overview dates, into cur/ marked read.
 # Later runs fetch only the new articles, into new/.  Cross-posts are
 # stored in each group; notmuch merges them by Message-ID.  The state of
