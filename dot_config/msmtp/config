@@ -1,10 +1,9 @@
 # msmtp - one account per mail account, picked by envelope-from
 #
-# neomutt sends with `msmtp --read-envelope-from -t` and sets the
-# envelope-from to the identity's address, so the account whose `from`
-# matches it is used.  Passwords come from mail-secret, OAuth2 tokens
-# from mail-oauth2.  Test an account with `msmtp -a <account>
-# --serverinfo`.
+# neomutt sends with `msmtp -t` and passes the identity's address with
+# -f, so the account whose `from` matches it is used.  Passwords come
+# from mail-secret, OAuth2 tokens from mail-oauth2.  Test an account
+# with `msmtp -a <account> --serverinfo`.
 
 defaults
 auth on

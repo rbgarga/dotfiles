@@ -81,9 +81,9 @@ set postpone = ask-yes
 set recall = ask-yes
 
 # --- Sending --------------------------------------------------------
-# msmtp picks the account by the envelope-from, which is always the From
-# of the message (see ~/.config/msmtp/config)
-set sendmail = "msmtp --read-envelope-from -t"
+# use_envelope_from passes the From address to msmtp with -f, and msmtp
+# picks the account whose from matches it (see ~/.config/msmtp/config)
+set sendmail = "msmtp -t"
 set use_envelope_from = yes
 set use_from = yes
 # A reply to a list keeps the user in Mail-Followup-To (lists are known,
