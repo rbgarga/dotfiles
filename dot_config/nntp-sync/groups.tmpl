@@ -1,7 +1,7 @@
 # gmane groups mirrored by nntp-sync into ~/Mail/lists/<short name>,
 # rendered from .chezmoidata/mail.yaml
 #
-# <gmane group> <short name> <days of history kept>
+# <gmane group> <short name> <days of history kept> [skip=<regex>] [read]
 {{ range .mail.groups -}}
-{{ printf "%-34s %-22s %d" .group .name (int .days) }}
+{{ printf "%-34s %-22s %d" .group .name (int .days) }}{{ with get . "skip" }} skip={{ . }}{{ end }}{{ if get . "read" }} read{{ end }}
 {{ end -}}

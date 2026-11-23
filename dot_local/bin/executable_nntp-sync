@@ -12,7 +12,13 @@
 #               older than the oldest one already mirrored, marked read
 #
 # The groups are listed in ~/.config/nntp-sync/groups, one per line:
-#   <gmane group> <short name> <days of history kept>
+#   <gmane group> <short name> <days of history kept> [<option> ...]
+# where the options are:
+#   skip=<regex>  a Perl regex, with no blanks (use \s) or #, matched
+#                 case-insensitively against the Subject of each article:
+#                 the ones that match are not fetched, nor stored
+#   read          every article is delivered read, not only the first
+#                 run's history
 # and each is mirrored into ~/Mail/lists/<short name>, where notmuch
 # indexes it (mail-sync removes what grows older than <days>, and an
 # article removed is not fetched again).  The first run of a group
@@ -89,13 +95,28 @@ my (@groups, %by_name);
 	while (my $line = <$fh>) {
 		$line =~ s/#.*//;
 		next unless $line =~ /\S/;
-		my ($name, $short, $days) = split(' ', $line);
+		my ($name, $short, $days, @opts) = split(' ', $line);
 		unless (defined $days && $days =~ /^\d+$/
 		    && $short =~ /^[\w.+-]+$/) {
-			warning("$groups_file:$.: expected <group> <short name> <days>");
+			warning("$groups_file:$.: expected "
+			    . "<group> <short name> <days> [<option> ...]");
 			exit 2;
 		}
 		my $g = { name => $name, short => $short, days => $days };
+		for my $opt (@opts) {
+			if ($opt eq 'read') {
+				$g->{read} = 1;
+			} elsif ($opt =~ /^skip=(.+)$/) {
+				$g->{skip} = eval { qr/$1/i } or do {
+					warning("$groups_file:$.: bad skip pattern: "
+					    . ($@ =~ s/ at \S+ line \d+.*//sr));
+					exit 2;
+				};
+			} else {
+				warning("$groups_file:$.: unknown option $opt");
+				exit 2;
+			}
+		}
 		push @groups, $g;
 		$by_name{$name} = $by_name{$short} = $g;
 	}
@@ -262,20 +283,40 @@ sub deliver {
 
 # Fetch articles from..to into the group's Maildir.  Articles up to
 # seen_upto are delivered read.  Missing numbers (expired or cancelled
-# articles) are skipped.  progress is called with each number done.
+# articles) are skipped, and so are those whose subject matches the
+# group's skip pattern, found in the overview of each window of articles
+# before any of them is downloaded.  progress is called with each number
+# done.
 sub fetch {
 	my ($nntp, $g, $from, $to, $seen_upto, $progress) = @_;
 	my $dir = maildir_for($g);
 	my $count = 0;
-	for my $n ($from .. $to) {
-		if (my $lines = $nntp->article($n)) {
-			deliver($dir, $lines, $n <= $seen_upto);
-			$count++;
-			note("$g->{short}: $count articles") if $count % 500 == 0;
-		} elsif (($nntp->code // 0) != 423 && ($nntp->code // 0) != 430) {
-			die "ARTICLE $n failed: " . ($nntp->message // '') . "\n";
+	for (my $lo = $from; $lo <= $to; $lo += $window) {
+		my $hi = $lo + $window - 1;
+		$hi = $to if $hi > $to;
+		my %skip;
+		if ($g->{skip}) {
+			my $over = $nntp->xover([$lo, $hi]);
+			if ($over) {
+				for my $num (keys %$over) {
+					$skip{$num} = 1 if ($over->{$num}[0] // '') =~ $g->{skip};
+				}
+			} elsif (($nntp->code // 0) != 420 && ($nntp->code // 0) != 423) {
+				die "OVER $lo-$hi failed: " . ($nntp->message // '') . "\n";
+			}
 		}
-		$progress->($n) if $progress;
+		for my $n ($lo .. $hi) {
+			if ($skip{$n}) {
+				# not wanted
+			} elsif (my $lines = $nntp->article($n)) {
+				deliver($dir, $lines, $n <= $seen_upto);
+				$count++;
+				note("$g->{short}: $count articles") if $count % 500 == 0;
+			} elsif (($nntp->code // 0) != 423 && ($nntp->code // 0) != 430) {
+				die "ARTICLE $n failed: " . ($nntp->message // '') . "\n";
+			}
+			$progress->($n) if $progress;
+		}
 	}
 	return $count;
 }
@@ -319,7 +360,7 @@ sub sync_group {
 	my $from = $last + 1;
 	$from = $sfirst if $from < $sfirst;
 	return 0 if $from > $slast;
-	return fetch($nntp, $g, $from, $slast, $hist,
+	return fetch($nntp, $g, $from, $slast, $g->{read} ? $slast : $hist,
 	    sub { write_state($g, $first, $_[0], $hist) });
 }
 

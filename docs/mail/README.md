@@ -167,6 +167,14 @@ raising a list's days, fetch its older history with:
 nntp-sync -v --backfill freebsd-current 720
 ```
 
+Two optional settings of a group in `mail.yaml` change what is
+fetched. `skip` is a Perl regex: the articles whose Subject matches it
+are neither fetched nor stored (commits-src skips the commits to
+`stable/*`, the branches whose commits are of no interest). `read: true`
+delivers every article already read, for the lists used only to look
+things up (git). Changing either affects only the articles fetched from
+then on; the ones already mirrored are removed or marked read by hand.
+
 ## 6. Using neomutt
 
 neomutt starts in the Personal INBOX. The sidebar holds Flagged (all

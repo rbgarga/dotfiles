@@ -58,6 +58,10 @@ mail:
   # removes the messages that grow older (flagged ones stay).  After
   # raising days, `nntp-sync --backfill <name> <days>` fetches the older
   # history.  An optional title replaces the name in neomutt's sidebar.
+  # Optional skip is a Perl regex without blanks (use \s) or #: the
+  # articles whose Subject matches it, case-insensitively, are neither
+  # fetched nor stored.  With read: true every article is delivered
+  # read, for the lists kept only to be searched.
   groups:
     # FreeBSD discussion and announcements
     - { group: gmane.os.freebsd.announce, name: freebsd-announce, days: 360 }
@@ -71,9 +75,9 @@ mail:
     - { group: gmane.os.freebsd.devel.wireless, name: freebsd-wireless, days: 360 }
     # FreeBSD commit lists, high volume: a few weeks only
     - { group: gmane.os.freebsd.devel.cvs.ports, name: dev-commits-ports-all, title: commits-ports, days: 30 }
-    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, title: commits-src, days: 60 }
+    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, title: commits-src, days: 60, skip: '^git:\s\w+\s-\sstable/' }
     # Other projects
-    - { group: gmane.comp.version-control.git, name: git, days: 360 }
+    - { group: gmane.comp.version-control.git, name: git, days: 360, read: true }
     - { group: gmane.comp.tools.sudo.announce, name: sudo-announce, days: 360 }
     - { group: gmane.comp.tools.sudo.devel, name: sudo-workers, days: 360 }
     - { group: gmane.comp.web.curl.announce, name: curl-announce, days: 360 }
