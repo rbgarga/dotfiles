@@ -185,6 +185,7 @@ then the Lists.
 |---|---|
 | `gg` / `G` | first / last message |
 | `^d` / `^u` | half page down / up |
+| `j` / `k` | in a message: line down / up (`J` / `K`: next / previous message) |
 | `^j` / `^k` / `^o` | sidebar next / previous / open |
 | `B` | toggle the sidebar |
 | `,n` / `,p` | open the next / previous mailbox with unread mail |
