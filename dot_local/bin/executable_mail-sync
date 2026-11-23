@@ -109,7 +109,7 @@ prune_lists() {
 	lists=${HOME}/Mail/lists
 	[ -f "${groups}" ] || return 0
 	grep -v -e '^#' -e '^[[:space:]]*$' "${groups}" |
-	while read -r _ name days; do
+	while read -r _ name days _; do
 		n=$(notmuch search --output=files \
 		    "folder:lists/${name} and date:..${days}d and not tag:flagged" |
 		    grep -F "${lists}/${name}/" | tee "${state}/prune" | wc -l)
