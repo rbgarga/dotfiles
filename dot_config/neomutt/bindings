@@ -1,9 +1,10 @@
 # Key bindings: vim-ish movement and the message actions of docs/mail/
 #
-# Overridden defaults: j and k in the pager (next-undeleted and
-# previous-undeleted, still on J and K), g (group-reply, now R), G
-# (fetch-mail), y (browse-mailboxes), R (recall-message, offered by m
-# anyway), ^D and ^U (thread delete/undelete), ^K (extract-keys).
+# Overridden defaults: J and K in the pager (next-entry and
+# previous-entry; j and k still go to the next and previous message), g
+# (group-reply, now R), G (fetch-mail), y (browse-mailboxes), R
+# (recall-message, offered by m anyway), ^D and ^U (thread
+# delete/undelete), ^K (extract-keys).
 #
 # d (Delete), y (Archive) and ,u (Unlabel) depend on the mailbox, so they
 # are (re)defined by the folder-hooks in actions/.
@@ -16,10 +17,10 @@ bind pager gg top
 bind pager G bottom
 bind index,pager \Cd half-down
 bind index,pager \Cu half-up
-# In the pager j and k scroll by line; J and K (the defaults) still go to
-# the next and previous message
-bind pager j next-line
-bind pager k previous-line
+# In the pager J and K scroll by line; j and k (the defaults) go to the
+# next and previous message
+bind pager J next-line
+bind pager K previous-line
 
 # --- Sidebar --------------------------------------------------------
 bind index,pager \Cj sidebar-next
