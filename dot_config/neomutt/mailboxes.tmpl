@@ -3,6 +3,8 @@
 #
 # INBOX, Sent and Drafts are the real Maildirs; label and list views are
 # notmuch queries, so they also show the user's replies in each thread.
+# A label view leaves out the messages tagged pending-label, the ones
+# Delete or Unlabel has just acted on (see actions/label).
 # folder-hooks match the Maildir path or the notmuch URL, and run in the
 # order they are defined: defaults, then the account, then the mailbox.
 
@@ -30,8 +32,8 @@ named-mailboxes "{{ .title }}" "+{{ $a }}/inbox"
 folder-hook '/Mail/{{ $a }}/inbox/?$' 'set my_reply_record="{{ $rec }}+{{ $a }}/inbox"; source ~/.config/neomutt/actions/inbox'
 {{- range .labels }}
 
-virtual-mailboxes "  {{ . }}" "notmuch://?query=folder:{{ $a }}/{{ . }}"
-folder-hook 'folder:{{ regexQuoteMeta (printf "%s/%s" $a .) }}$' 'set my_label="{{ $a }}/{{ . }}" my_reply_record="{{ $rec }}+{{ $a }}/{{ . }}"; source ~/.config/neomutt/actions/label{{ if has . $flat }}; set use_threads=flat{{ end }}'
+virtual-mailboxes "  {{ . }}" "notmuch://?query=folder:{{ $a }}/{{ . }} and not tag:pending-label"
+folder-hook 'folder:{{ regexQuoteMeta (printf "%s/%s" $a .) }} ' 'set my_label="{{ $a }}/{{ . }}" my_reply_record="{{ $rec }}+{{ $a }}/{{ . }}"; source ~/.config/neomutt/actions/label{{ if has . $flat }}; set use_threads=flat{{ end }}'
 {{- end }}
 
 named-mailboxes "  Sent" "+{{ $a }}/sent" "  Drafts" "+{{ $a }}/drafts"

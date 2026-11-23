@@ -231,9 +231,10 @@ Before relying on them:
 - **Flagged and searches** use the Personal account: a reply from there
   only picks between Personal identities. Change From on the compose
   screen if needed.
-- **Delete and Unlabel in a label view** act on the selected message
-  only, and refuse a message that is not under the label (e.g. the
-  user's own reply shown in the thread).
+- **Delete and Unlabel in a label view** only act on a message that
+  is under the label. Another one (e.g. the user's own reply shown in
+  the thread) is hidden and left alone, which the status line says, and
+  is back when the view is reopened.
 - **nntp-sync** fetches one article at a time, about 5 a second, so the
   first import of the commit lists takes hours.
 - **Spotlight**: `~/Mail/.metadata_never_index` may be ignored by

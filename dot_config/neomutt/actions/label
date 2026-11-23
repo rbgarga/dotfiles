@@ -1,5 +1,12 @@
 # Label views (notmuch queries): Delete and Unlabel go through mail-label,
 # which only touches the message's file under this label, never the All
 # Mail copy.  Needs $my_label (<account>/<label>) from the folder-hook.
-macro index,pager d "<enter-command>set wait_key=no<enter><pipe-message>mail-label delete '$my_label'<enter><enter-command>set wait_key=yes<enter>" "Delete: move to Trash"
-macro index,pager ,u "<enter-command>set wait_key=no<enter><pipe-message>mail-label unlabel '$my_label'<enter><enter-command>set wait_key=yes<enter>" "Unlabel: remove from this label"
+#
+# The message is tagged pending-label, which the label views leave out,
+# so it is hidden at once; mail-label then acts on the tagged messages
+# and takes the tag off.  It runs from <enter-command> (the backticks are
+# escaped, to run when the key is pressed), not <pipe-message>, which
+# would leave neomutt's screen for a moment.  Its outcome is shown last,
+# after <check-stats>, which clears the message line.
+macro index,pager d "<modify-labels-then-hide>+pending-label<enter><sync-mailbox><enter-command>set my_done=\"\`mail-label delete '$my_label' 2>&1\`\"<enter><check-stats><enter-command>echo \"\$my_done\"<enter>" "Delete: move to Trash"
+macro index,pager ,u "<modify-labels-then-hide>+pending-label<enter><sync-mailbox><enter-command>set my_done=\"\`mail-label unlabel '$my_label' 2>&1\`\"<enter><check-stats><enter-command>echo \"\$my_done\"<enter>" "Unlabel: remove from this label"
