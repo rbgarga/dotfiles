@@ -41,7 +41,10 @@ folder-hook '/Mail/{{ $a }}/(sent|drafts)/?$' 'source ~/.config/neomutt/actions/
 {{- end }}
 
 # --- Lists (hooks in lists) -----------------------------------------
-virtual-mailboxes "Lists" "notmuch://?query=path:lists/**"
+# Lists is only the heading of the list views: its query matches nothing
+# (no message has that tag), so it is empty and never has unread mail
+# for ,n and ,p to stop at
+virtual-mailboxes "Lists" "notmuch://?query=path:lists/** and tag:no-such-tag"
 {{- range .mail.groups }}
 virtual-mailboxes "  {{ get . "title" | default .name }}" "notmuch://?query=folder:lists/{{ .name }}"
 {{- end }}
