@@ -75,7 +75,7 @@ mail:
     - { group: gmane.os.freebsd.devel.wireless, name: freebsd-wireless, days: 360 }
     # FreeBSD commit lists, high volume: a few weeks only
     - { group: gmane.os.freebsd.devel.cvs.ports, name: dev-commits-ports-all, title: commits-ports, days: 30 }
-    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, title: commits-src, days: 60, skip: '^git:\s\w+\s-\sstable/' }
+    - { group: gmane.os.freebsd.devel.cvs.src, name: dev-commits-src-all, title: commits-src, days: 60, skip: '^git:\s\w+\s-\s(stable|releng)/' }
     # Other projects
     - { group: gmane.comp.version-control.git, name: git, days: 360, read: true }
     - { group: gmane.comp.tools.sudo.announce, name: sudo-announce, days: 360 }
